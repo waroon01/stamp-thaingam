@@ -1,0 +1,339 @@
+/* ═══════════════════════════════════════════════════════════════════
+   ระบบลงรับหนังสือ · โรงเรียนชุมชนวัดไทยงาม
+   ชุดสไตล์ประกอบ Tailwind — โทนหมึกน้ำเงินราชการและตรายางสีชาด
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --ink-50:  #F2F5FB;
+  --ink-100: #E1E8F5;
+  --ink-200: #C3D0EA;
+  --ink-300: #93A9D5;
+  --ink-400: #5E7BBB;
+  --ink-500: #3A5B9E;
+  --ink-600: #2A4787;
+  --ink-700: #1F3568;
+  --ink-900: #12203D;
+  --seal-500: #B23A34;
+  --desk-100: #F1F3F8;
+  --desk-200: #E4E8F1;
+  --desk-300: #D3D9E6;
+}
+
+* { margin: 0; padding: 0; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: 'Sarabun', system-ui, -apple-system, sans-serif;
+  overscroll-behavior-y: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink-500);
+  outline-offset: 2px;
+}
+
+/* ── ปุ่มบนแถบบนสุด ─────────────────────────────────────────────── */
+.topbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  color: #fff;
+  transition: background-color .15s ease;
+}
+.topbar-btn:hover { background: rgba(255, 255, 255, .12); }
+
+/* ── แผงเครื่องมือ ──────────────────────────────────────────────── */
+.tool-heading {
+  font-size: .6875rem;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  margin-bottom: .5rem;
+}
+
+.tool-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  width: 100%;
+  padding: .625rem .75rem;
+  border-radius: .625rem;
+  font-size: .875rem;
+  font-weight: 500;
+  color: var(--ink-900);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+.tool-row:hover { background: var(--desk-100); }
+.tool-row.is-active { background: var(--ink-100); color: var(--ink-700); }
+
+.tool-icon {
+  width: 1.125rem;
+  text-align: center;
+  color: var(--ink-500);
+  font-size: .9375rem;
+}
+
+/* ── การ์ดตรายาง: จำลองหน้าตาตรายางจริงเพื่อให้เลือกได้ด้วยสายตา ── */
+.stamp-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .375rem;
+  padding: .625rem .5rem;
+  border: 1px solid var(--desk-300);
+  border-radius: .75rem;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.stamp-card:hover {
+  border-color: var(--ink-300);
+  box-shadow: 0 6px 16px -8px rgba(18, 32, 61, .35);
+  transform: translateY(-1px);
+}
+.stamp-card:active { transform: translateY(0); }
+
+.stamp-card-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 3.25rem;
+  padding: .375rem .25rem;
+  border: 1.5px solid var(--seal-500);
+  border-radius: .375rem;
+  color: var(--seal-500);
+  text-align: center;
+  transform: rotate(-1.5deg);
+}
+
+.stamp-card-label {
+  font-size: .75rem;
+  font-weight: 500;
+  color: var(--ink-700);
+}
+
+/* ── การ์ดรูปทรง: ตัวอย่างเปลี่ยนสีตามที่เลือกไว้จริง ──────────── */
+.shape-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .25rem;
+  padding: .5rem .25rem;
+  border: 1px solid var(--desk-300);
+  border-radius: .625rem;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.shape-card:hover {
+  border-color: var(--ink-300);
+  box-shadow: 0 6px 16px -8px rgba(18, 32, 61, .35);
+  transform: translateY(-1px);
+}
+.shape-card:active { transform: translateY(0); }
+
+.shape-glyph {
+  width: 2rem;
+  height: 2rem;
+  fill: var(--shape-fill, var(--ink-500));
+  stroke: var(--shape-stroke, var(--ink-900));
+  stroke-width: 2;
+  stroke-linejoin: round;
+  opacity: var(--shape-opacity, 1);
+}
+
+.shape-card-label {
+  font-size: .6875rem;
+  font-weight: 500;
+  color: var(--ink-700);
+}
+
+/* ── ปุ่มควบคุมหน้า/ซูม ─────────────────────────────────────────── */
+.ctrl-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  color: var(--ink-600);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+.ctrl-btn:hover { background: var(--desk-200); }
+.ctrl-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+#page-input::-webkit-outer-spin-button,
+#page-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+#page-input { -moz-appearance: textfield; }
+
+/* ── ฟอร์ม ──────────────────────────────────────────────────────── */
+.field label {
+  display: block;
+  font-size: .75rem;
+  font-weight: 500;
+  color: var(--ink-500);
+  margin-bottom: .25rem;
+}
+
+.field input[type="text"],
+.field input[type="url"],
+.field input[type="date"],
+.field select {
+  width: 100%;
+  padding: .5rem .75rem;
+  font-size: .875rem;
+  color: var(--ink-900);
+  background: #fff;
+  border: 1px solid var(--desk-300);
+  border-radius: .5rem;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.field input:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--ink-500);
+  box-shadow: 0 0 0 3px rgba(58, 91, 158, .12);
+}
+
+.field input::placeholder { color: var(--ink-300); }
+
+/* ── ปุ่มมาตรฐาน ────────────────────────────────────────────────── */
+.btn-primary,
+.btn-secondary,
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  padding: .625rem 1rem;
+  border-radius: .625rem;
+  font-size: .875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+
+.btn-primary { background: var(--ink-700); color: #fff; }
+.btn-primary:hover { background: var(--ink-900); }
+
+.btn-secondary { background: #fff; color: var(--ink-700); border-color: var(--desk-300); }
+.btn-secondary:hover { border-color: var(--ink-300); background: var(--ink-50); }
+
+.btn-ghost { background: transparent; color: var(--ink-600); }
+.btn-ghost:hover { background: var(--desk-100); }
+
+/* ── กล่องข้อความลอย ────────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(11, 21, 42, .45);
+  backdrop-filter: blur(2px);
+}
+.modal-backdrop.hidden { display: none; }
+
+.modal-card {
+  width: 100%;
+  background: #fff;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 24px 60px -20px rgba(11, 21, 42, .55);
+  animation: cardIn .18s ease-out;
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(8px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── หน้ากระดาษในพื้นที่ทำงาน ───────────────────────────────────── */
+.page-wrapper {
+  position: relative;
+  background: #fff;
+  border-radius: .25rem;
+  box-shadow: 0 1px 2px rgba(18, 32, 61, .08), 0 12px 28px -12px rgba(18, 32, 61, .28);
+}
+
+.canvas-container { transform-origin: top left; }
+
+/* ── พื้นที่แปลงข้อความเป็นภาพ (ต้องไม่ display:none) ───────────── */
+.render-area {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  display: inline-block;
+  width: max-content;
+  max-width: 600px;
+  background: transparent;
+}
+
+/* กล่องข้อความต้องกว้างพอดีกับตัวอักษร ไม่ยืดเต็มพื้นที่ */
+.render-area .ql-editor {
+  display: inline-block;
+  width: max-content;
+  max-width: 600px;
+  padding: 2px 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: visible;
+}
+
+.render-area .ql-editor p,
+.render-area .ql-editor li { white-space: pre-wrap; }
+
+/* ── ตัวแก้ไขข้อความ Quill ──────────────────────────────────────── */
+.ql-toolbar.ql-snow {
+  border-color: var(--desk-300) !important;
+  border-radius: .75rem .75rem 0 0;
+}
+.ql-container.ql-snow {
+  border-color: var(--desk-300) !important;
+  border-radius: 0 0 .75rem .75rem;
+  font-family: 'Sarabun', sans-serif;
+}
+
+/* ── แถบเลื่อน ──────────────────────────────────────────────────── */
+#container-warper::-webkit-scrollbar,
+#toolPanel::-webkit-scrollbar,
+#receiveForm::-webkit-scrollbar { width: 10px; height: 10px; }
+
+#container-warper::-webkit-scrollbar-thumb,
+#toolPanel::-webkit-scrollbar-thumb,
+#receiveForm::-webkit-scrollbar-thumb {
+  background: var(--desk-300);
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+#container-warper::-webkit-scrollbar-thumb:hover { background: var(--ink-300); background-clip: content-box; }
+
+/* ── สถานะปิดใช้งาน ─────────────────────────────────────────────── */
+button:disabled { cursor: not-allowed; opacity: .5; }
+
+/* ── เคารพการตั้งค่าลดการเคลื่อนไหว ────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}

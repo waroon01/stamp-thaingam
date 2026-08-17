@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#16294A" />
+  <title>ระบบลงรับหนังสือ · โรงเรียนชุมชนวัดไทยงาม</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: {
+              50:  '#F2F5FB', 100: '#E1E8F5', 200: '#C3D0EA', 300: '#93A9D5',
+              400: '#5E7BBB', 500: '#3A5B9E', 600: '#2A4787', 700: '#1F3568',
+              800: '#182A50', 900: '#12203D', 950: '#0B152A'
+            },
+            seal:  { 400: '#D0665F', 500: '#B23A34', 600: '#932A25', 700: '#75211D' },
+            desk:  { 100: '#F1F3F8', 200: '#E4E8F1', 300: '#D3D9E6' },
+            leaf:  { 500: '#1B7A5A', 600: '#146049' }
+          },
+          fontFamily: {
+            sans:    ['Sarabun', 'system-ui', 'sans-serif'],
+            display: ['"Noto Serif Thai"', 'Georgia', 'serif'],
+            mono:    ['"IBM Plex Mono"', 'ui-monospace', 'monospace']
+          },
+          boxShadow: {
+            page:  '0 1px 2px rgba(18,32,61,.08), 0 12px 28px -12px rgba(18,32,61,.28)',
+            panel: '0 -8px 30px -12px rgba(18,32,61,.35)',
+            pill:  '0 6px 24px -8px rgba(18,32,61,.45)'
+          }
+        }
+      }
+    }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Noto+Serif+Thai:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+        integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body class="bg-desk-100 text-ink-900 antialiased">
+
+<!-- ══════════════════════════ หน้าเริ่มต้น ══════════════════════════ -->
+<main id="startSection" class="min-h-[100dvh] flex flex-col">
+
+  <header class="px-5 sm:px-8 py-5 flex items-center gap-3">
+    <img id="brand-logo" src="https://res.cloudinary.com/djkbdwnsc/image/upload/f_auto,q_auto,c_fit,h_132,w_132/v1786978522/next-fullStack/Logo-thaingam_1_k2iec7.png"
+         alt="" class="h-11 w-auto max-w-[3.5rem] object-contain shrink-0" />
+    <div class="leading-tight">
+      <p id="brand-school" class="font-display font-semibold text-ink-900">โรงเรียนชุมชนวัดไทยงาม</p>
+      <p class="text-xs text-ink-500">งานสารบรรณ · ลงรับหนังสือราชการ</p>
+    </div>
+
+    <button id="openSettingsBtn"
+            class="ml-auto inline-flex items-center gap-2 rounded-lg border border-ink-200 px-3 h-9
+                   text-sm font-medium text-ink-600 hover:bg-ink-50 hover:border-ink-300 transition-colors"
+            title="ตั้งค่าชื่อโรงเรียนและผู้บริหาร">
+      <i class="fa-solid fa-gear"></i>
+      <span class="hidden sm:inline">ตั้งค่า</span>
+    </button>
+  </header>
+
+  <div class="flex-1 grid lg:grid-cols-[1.05fr,1fr] gap-10 lg:gap-16 items-center px-5 sm:px-8 lg:px-16 pb-12 max-w-7xl mx-auto w-full">
+
+    <!-- ซ้าย: สาระ -->
+    <section>
+      <p class="inline-flex items-center gap-2 text-xs font-medium tracking-wide text-ink-600 bg-ink-100 rounded-full px-3 py-1 mb-5">
+        <span class="w-1.5 h-1.5 rounded-full bg-leaf-500"></span>
+        ทำงานในเครื่องคุณ สามารถส่งไฟล์ขึ้นเซิร์ฟเวอร์เก็บไว้และบันทึกค่าต่างๆ ได้
+      </p>
+
+      <h1 class="font-display text-3xl sm:text-4xl lg:text-[2.75rem] leading-[1.25] font-bold text-ink-900">
+        ประทับตรารับหนังสือ<br class="hidden sm:block" />
+        พร้อมบันทึกพิจารณาสั่งการได้
+      </h1>
+
+      <p class="mt-4 text-ink-600 text-base sm:text-lg leading-relaxed max-w-xl">
+        เปิดไฟล์ PDF ที่ได้รับมา วางตรารับ ตราสั่งการ ลายเซ็น และไฮไลท์ข้อความ
+        แล้วบันทึกเป็น PDF หรือสั่งพิมพ์ได้ทันที
+      </p>
+
+      <dl class="mt-8 grid sm:grid-cols-3 gap-x-6 gap-y-4 max-w-xl">
+        <div class="border-l-2 border-ink-200 pl-3">
+          <dt class="font-medium text-sm text-ink-900">ตรายางสำเร็จรูป</dt>
+          <dd class="text-xs text-ink-500 mt-0.5">รับหนังสือ สั่งการ ผอ. รอง ผอ.</dd>
+        </div>
+        <div class="border-l-2 border-ink-200 pl-3">
+          <dt class="font-medium text-sm text-ink-900">สแกนหัวเรื่อง</dt>
+          <dd class="text-xs text-ink-500 mt-0.5">อ่านคำว่า "เรื่อง" จากหน้าแรกให้</dd>
+        </div>
+        <div class="border-l-2 border-ink-200 pl-3">
+          <dt class="font-medium text-sm text-ink-900">ค้างงานไว้ได้</dt>
+          <dd class="text-xs text-ink-500 mt-0.5">บันทึกงานเป็นไฟล์แล้วเปิดต่อทีหลัง</dd>
+        </div>
+      </dl>
+    </section>
+
+    <!-- ขวา: จุดเริ่มงาน -->
+    <section class="relative">
+      <!-- ตรายางประกอบ -->
+      <div aria-hidden="true"
+           class="hidden sm:block absolute -top-8 -right-2 lg:-right-6 rotate-[-8deg] select-none pointer-events-none z-10">
+        <div class="border-2 border-seal-500/70 rounded-lg px-5 py-3 bg-white/70 backdrop-blur-sm shadow-sm">
+          <p class="font-display text-seal-500 text-lg leading-none font-bold">รับแล้ว</p>
+          <p class="font-mono text-[10px] text-seal-600/80 mt-1.5 tracking-wider">เลขที่รับ ๐๑๒๔</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-page p-6 sm:p-8">
+        <div id="dropStampZone"
+             class="group relative border-2 border-dashed border-ink-200 rounded-xl px-6 py-12 text-center cursor-pointer
+                    hover:border-ink-400 hover:bg-ink-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-500
+                    transition-colors"
+             role="button" tabindex="0" aria-label="เลือกหรือลากไฟล์ PDF">
+          <span class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-ink-100 text-ink-600 mb-4
+                       group-hover:bg-ink-600 group-hover:text-white transition-colors">
+            <i class="fa-solid fa-file-arrow-up text-xl"></i>
+          </span>
+          <p class="font-medium text-ink-900">ลากไฟล์ PDF มาวางที่นี่</p>
+          <p class="text-sm text-ink-500 mt-1">หรือคลิกเพื่อเลือกจากเครื่อง</p>
+          <input type="file" id="stampFileInput" class="hidden" accept="application/pdf" />
+        </div>
+
+        <div id="stampList" class="mt-4 empty:mt-0"></div>
+
+        <div class="flex items-center gap-3 my-6">
+          <span class="h-px flex-1 bg-ink-100"></span>
+          <span class="text-xs text-ink-400">หรือ</span>
+          <span class="h-px flex-1 bg-ink-100"></span>
+        </div>
+
+        <input type="file" id="import-json" accept=".json" class="hidden" />
+        <button id="openImportJsonBtn"
+                class="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-ink-200 px-5 py-3
+                       font-medium text-ink-700 hover:bg-ink-50 hover:border-ink-300 transition-colors">
+          <i class="fa-solid fa-folder-open text-ink-400"></i>
+          เปิดงานที่บันทึกค้างไว้
+        </button>
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- ══════════════════════════ หน้าทำงาน ══════════════════════════ -->
+<div id="previewSection" class="hidden fixed inset-0 z-30 flex flex-col bg-desk-200">
+
+  <!-- แถบบน -->
+  <header class="shrink-0 bg-ink-900 text-white">
+    <div class="h-14 px-3 sm:px-4 flex items-center gap-3">
+      <button id="back-to-upload-btn"
+              class="shrink-0 w-9 h-9 rounded-lg hover:bg-white/10 flex items-center justify-center transition-colors"
+              title="กลับหน้าแรก" aria-label="กลับหน้าแรก">
+        <i class="fa-solid fa-arrow-left"></i>
+      </button>
+
+      <div class="min-w-0 flex-1">
+        <p id="doc-title" class="truncate text-sm font-medium">เอกสาร</p>
+        <p class="text-[11px] text-ink-300 font-mono">
+          <span id="doc-pagecount">0</span> หน้า
+        </p>
+      </div>
+
+      <div class="flex items-center gap-1 sm:gap-1.5">
+        <button id="export-json" class="topbar-btn" title="บันทึกงานค้างไว้ (JSON)" aria-label="บันทึกงาน">
+          <i class="fa-regular fa-floppy-disk"></i>
+        </button>
+        <button id="export-jpg-btn" class="topbar-btn hidden sm:flex" title="บันทึกเป็นรูป JPG" aria-label="บันทึก JPG">
+          <i class="fa-regular fa-image"></i>
+        </button>
+        <button id="upload-drive-btn" class="topbar-btn hidden" title="อัปโหลดขึ้น Google Drive" aria-label="อัปโหลดขึ้น Drive">
+          <i class="fab fa-google-drive"></i>
+        </button>
+        <button id="print-pdf-btn" class="topbar-btn" title="พิมพ์" aria-label="พิมพ์">
+          <i class="fa-solid fa-print"></i>
+        </button>
+        <button id="export-pdf-btn"
+                class="ml-1 inline-flex items-center gap-2 rounded-lg bg-white text-ink-900 px-3 sm:px-4 h-9
+                       text-sm font-semibold hover:bg-ink-100 transition-colors">
+          <i class="fa-solid fa-file-arrow-down"></i>
+          <span class="hidden sm:inline">ดาวน์โหลด PDF</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- พื้นที่หลัก -->
+  <div class="flex-1 flex min-h-0 relative">
+
+    <!-- แผงเครื่องมือ -->
+    <div id="toolBackdrop" class="fixed inset-0 bg-ink-950/40 z-40 hidden md:hidden"></div>
+
+    <aside id="toolPanel"
+           class="fixed inset-x-0 bottom-0 z-50 max-h-[78dvh] overflow-y-auto rounded-t-2xl bg-white shadow-panel
+                  translate-y-full transition-transform duration-300 ease-out
+                  md:static md:z-0 md:translate-y-0 md:max-h-none md:w-72 md:shrink-0 md:rounded-none md:shadow-none
+                  md:border-r md:border-desk-300 md:transition-none">
+
+      <div class="md:hidden sticky top-0 bg-white pt-3 pb-2 px-4 flex items-center justify-between border-b border-desk-200">
+        <span class="mx-auto absolute left-1/2 -translate-x-1/2 top-1.5 w-10 h-1 rounded-full bg-desk-300"></span>
+        <p class="font-display font-semibold text-ink-900 mt-2">เครื่องมือ</p>
+        <button id="closeToolPanel" class="mt-2 w-8 h-8 rounded-lg hover:bg-desk-100 text-ink-500" aria-label="ปิดเครื่องมือ">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-4 space-y-6">
+
+        <!-- ตรายาง -->
+        <section>
+          <h2 class="tool-heading">ตรายาง</h2>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="add-stamp-btn" class="stamp-card">
+              <span class="stamp-card-frame">
+                <span class="font-display text-[11px] leading-tight">รับหนังสือ</span>
+                <span class="font-mono text-[8px] opacity-70 mt-0.5">เลขที่รับ ____</span>
+              </span>
+              <span class="stamp-card-label">ตรารับ</span>
+            </button>
+
+            <button id="stamp-command-btn" class="stamp-card">
+              <span class="stamp-card-frame">
+                <span class="font-display text-[11px] leading-tight">เรียน ผอ.</span>
+                <span class="text-[8px] opacity-70 mt-0.5">☑ เพื่อทราบ</span>
+              </span>
+              <span class="stamp-card-label">ตราสั่งการ</span>
+            </button>
+
+            <button id="add-director-stamp-btn" class="stamp-card">
+              <span class="stamp-card-frame">
+                <span id="card-director-name" class="text-[9px] leading-tight">(นางสมคิด จันขุนทศ)</span>
+                <span id="card-director-title" class="text-[8px] opacity-70 mt-0.5">ผู้อำนวยการ</span>
+              </span>
+              <span class="stamp-card-label">ลงนาม ผอ.</span>
+            </button>
+
+            <button id="add-predirector-stamp-btn" class="stamp-card">
+              <span class="stamp-card-frame">
+                <span id="card-deputy-name" class="text-[9px] leading-tight">(นายอธิชาติ ไทยธานี)</span>
+                <span id="card-deputy-title" class="text-[8px] opacity-70 mt-0.5">รองผู้อำนวยการ</span>
+              </span>
+              <span class="stamp-card-label">ลงนาม รอง ผอ.</span>
+            </button>
+          </div>
+
+          <button id="openModalBtnFrm" class="tool-row mt-2">
+            <i class="fa-solid fa-clipboard-list tool-icon"></i>
+            <span class="flex-1 text-left">
+              กรอกข้อมูลลงรับ
+              <span class="block text-xs text-ink-400 font-normal">เลขที่รับ วันที่ ฝ่าย การสั่งการ</span>
+            </span>
+            <i class="fa-solid fa-chevron-right text-ink-300 text-xs"></i>
+          </button>
+        </section>
+
+        <!-- ปากกาและเครื่องหมาย -->
+        <section>
+          <h2 class="tool-heading">ปากกาและเครื่องหมาย</h2>
+          <div class="space-y-1">
+            <button id="highlight-text-btn" class="tool-row">
+              <i class="fa-solid fa-highlighter tool-icon"></i>
+              <span class="flex-1 text-left">ไฮไลท์แบบวาดมือ</span>
+              <span id="highlight-state" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-desk-200 text-ink-500">ปิด</span>
+            </button>
+
+            <div id="highlight-settings" class="hidden px-3 pt-1 pb-3 rounded-lg bg-desk-100 space-y-3">
+              <div>
+                <div class="flex justify-between text-xs text-ink-500 mb-1">
+                  <label for="highlight-size">ขนาดหัวปากกา</label>
+                  <span id="highlight-size-value" class="font-mono">10</span>
+                </div>
+                <input type="range" id="highlight-size" min="1" max="40" value="10" class="w-full accent-ink-600" />
+              </div>
+              <div class="flex items-center gap-3">
+                <label for="highlight-color" class="text-xs text-ink-500">สี</label>
+                <input type="color" id="highlight-color" value="#FFE14D" class="h-8 w-14 rounded border border-desk-300 bg-white" />
+                <span class="text-[11px] text-ink-400">กด Esc เพื่อเลิกวาด</span>
+              </div>
+            </div>
+
+            <button id="highlightgreen-text-btn" class="tool-row">
+              <i class="fa-solid fa-pen-nib tool-icon text-leaf-500"></i>
+              <span class="flex-1 text-left">ไฮไลท์เขียว</span>
+            </button>
+            <button id="highlightpink-text-btn" class="tool-row">
+              <i class="fa-regular fa-square tool-icon" style="color:#DB6FA0"></i>
+              <span class="flex-1 text-left">กล่องไฮไลท์ชมพู</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- แทรกลงเอกสาร -->
+        <section>
+          <h2 class="tool-heading">แทรกลงเอกสาร</h2>
+          <div class="space-y-1">
+            <button id="openModalBtn" class="tool-row">
+              <i class="fa-solid fa-signature tool-icon"></i>
+              <span class="flex-1 text-left">ลายเซ็น</span>
+            </button>
+            <button id="openTextModalBtn" class="tool-row">
+              <i class="fa-solid fa-font tool-icon"></i>
+              <span class="flex-1 text-left">ข้อความ</span>
+            </button>
+            <button id="insert-imageF-btn" class="tool-row">
+              <i class="fa-regular fa-image tool-icon"></i>
+              <span class="flex-1 text-left">รูปภาพ</span>
+            </button>
+
+            <button id="shape-btn" class="tool-row" aria-expanded="false" aria-controls="shape-settings">
+              <i class="fa-solid fa-shapes tool-icon"></i>
+              <span class="flex-1 text-left">รูปทรงเรขาคณิต</span>
+              <i id="shape-chevron" class="fa-solid fa-chevron-down text-ink-300 text-xs transition-transform"></i>
+            </button>
+
+            <div id="shape-settings" class="hidden px-3 pt-3 pb-3 rounded-lg bg-desk-100 space-y-3">
+              <div class="grid grid-cols-3 gap-2">
+                <button type="button" class="shape-card" data-shape="rect">
+                  <svg class="shape-glyph" viewBox="0 0 32 32" aria-hidden="true">
+                    <rect x="4" y="7" width="24" height="18" />
+                  </svg>
+                  <span class="shape-card-label">สี่เหลี่ยม</span>
+                </button>
+                <button type="button" class="shape-card" data-shape="circle">
+                  <svg class="shape-glyph" viewBox="0 0 32 32" aria-hidden="true">
+                    <circle cx="16" cy="16" r="11" />
+                  </svg>
+                  <span class="shape-card-label">วงกลม</span>
+                </button>
+                <button type="button" class="shape-card" data-shape="triangle">
+                  <svg class="shape-glyph" viewBox="0 0 32 32" aria-hidden="true">
+                    <polygon points="16,5 28,27 4,27" />
+                  </svg>
+                  <span class="shape-card-label">สามเหลี่ยม</span>
+                </button>
+              </div>
+
+              <div class="flex items-center gap-3">
+                <label for="shape-fill" class="text-xs text-ink-500 w-11 shrink-0">สีพื้น</label>
+                <input type="color" id="shape-fill" value="#3A5B9E"
+                       class="h-8 w-14 rounded border border-desk-300 bg-white shrink-0" />
+                <label class="ml-auto inline-flex items-center gap-1.5 text-xs text-ink-500 cursor-pointer">
+                  <input type="checkbox" id="shape-no-fill" class="accent-ink-600" />
+                  ไม่ใส่สีพื้น
+                </label>
+              </div>
+
+              <div class="flex items-center gap-3">
+                <label for="shape-stroke" class="text-xs text-ink-500 w-11 shrink-0">สีเส้น</label>
+                <input type="color" id="shape-stroke" value="#12203D"
+                       class="h-8 w-14 rounded border border-desk-300 bg-white shrink-0" />
+                <input type="range" id="shape-stroke-width" min="0" max="12" value="2"
+                       class="flex-1 accent-ink-600" aria-label="ความหนาเส้นขอบ" />
+                <span id="shape-stroke-width-value" class="font-mono text-xs text-ink-500 w-4 text-right">2</span>
+              </div>
+
+              <div>
+                <div class="flex justify-between text-xs text-ink-500 mb-1">
+                  <label for="shape-opacity">ความทึบ</label>
+                  <span id="shape-opacity-value" class="font-mono">100%</span>
+                </div>
+                <input type="range" id="shape-opacity" min="10" max="100" value="100" class="w-full accent-ink-600" />
+              </div>
+
+              <p class="text-[11px] leading-relaxed text-ink-400">
+                เลือกรูปทรงที่วางไว้แล้วบนเอกสาร แล้วปรับค่าตรงนี้ได้ทันที
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ตรวจสอบ -->
+        <section>
+          <h2 class="tool-heading">ตรวจสอบ</h2>
+          <div class="space-y-1">
+            <button id="detect-qr-btn" class="tool-row">
+              <i class="fa-solid fa-qrcode tool-icon"></i>
+              <span class="flex-1 text-left">อ่าน QR ในเอกสาร</span>
+            </button>
+            <button id="delete-object-btn" class="tool-row hover:bg-seal-500/5">
+              <i class="fa-regular fa-trash-can tool-icon text-seal-500"></i>
+              <span class="flex-1 text-left">ลบสิ่งที่เลือกอยู่</span>
+              <span class="text-[10px] font-mono text-ink-400">Del</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- ตั้งค่า -->
+        <section>
+          <h2 class="tool-heading">ตั้งค่า</h2>
+          <button id="openSettingsBtnTool" class="tool-row">
+            <i class="fa-solid fa-gear tool-icon"></i>
+            <span class="flex-1 text-left">
+              ชื่อโรงเรียนและผู้บริหาร
+              <span class="block text-xs text-ink-400 font-normal">ใช้กับตรายางและหัวเว็บทุกจุด</span>
+            </span>
+            <i class="fa-solid fa-chevron-right text-ink-300 text-xs"></i>
+          </button>
+        </section>
+
+        <p class="text-[11px] leading-relaxed text-ink-400 border-t border-desk-200 pt-4">
+          แตะวัตถุเพื่อย้ายหรือย่อขยาย · ปุ่มสีเขียวมุมบนขวาของวัตถุคือคัดลอก
+        </p>
+      </div>
+    </aside>
+
+    <!-- พื้นที่เอกสาร -->
+    <div id="container-warper" class="flex-1 overflow-auto relative">
+      <div id="pdf-container" class="flex flex-col items-center gap-6 p-4 sm:p-6 pb-32 w-full mx-auto"></div>
+
+      <div id="scroll-page-indicator"
+           class="fixed top-1/2 right-3 -translate-y-1/2 bg-ink-900/85 text-white text-xs font-mono px-2.5 py-1.5 rounded-lg
+                  pointer-events-none hidden">
+        หน้า 1
+      </div>
+    </div>
+
+    <!-- แถบควบคุมลอย -->
+    <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+      <div class="flex items-center gap-1 bg-white/95 backdrop-blur rounded-full shadow-pill px-1.5 py-1.5">
+        <button id="prev-page" class="ctrl-btn" aria-label="หน้าก่อนหน้า"><i class="fa-solid fa-chevron-up text-xs"></i></button>
+        <div class="flex items-center gap-1 px-1">
+          <input id="page-input" type="number" min="1" value="1"
+                 class="w-9 text-center font-mono text-sm bg-transparent border-0 focus:ring-0 p-0" />
+          <span class="text-ink-300 text-sm">/</span>
+          <span id="total-pages" class="font-mono text-sm text-ink-500 pr-1">1</span>
+        </div>
+        <button id="next-page" class="ctrl-btn" aria-label="หน้าถัดไป"><i class="fa-solid fa-chevron-down text-xs"></i></button>
+
+        <span class="w-px h-6 bg-desk-300 mx-1"></span>
+
+        <button id="zoom-out" class="ctrl-btn" aria-label="ย่อ"><i class="fa-solid fa-minus text-xs"></i></button>
+        <button id="zoom-percent" class="font-mono text-xs text-ink-600 w-11 text-center hover:text-ink-900" title="กลับไปขนาดพอดีหน้าจอ">100%</button>
+        <button id="zoom-in" class="ctrl-btn" aria-label="ขยาย"><i class="fa-solid fa-plus text-xs"></i></button>
+      </div>
+
+      <button id="mobileToolBtn"
+              class="md:hidden w-12 h-12 rounded-full bg-ink-900 text-white shadow-pill flex items-center justify-center"
+              aria-label="เปิดเครื่องมือ">
+        <i class="fa-solid fa-stamp text-lg"></i>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ แผงข้อมูลลงรับ ══════════════════════════ -->
+<div id="receiveBackdrop" class="fixed inset-0 bg-ink-950/40 z-40 hidden"></div>
+
+<aside id="receiveModal"
+       class="fixed top-0 right-0 z-50 h-[100dvh] w-full sm:max-w-md bg-white shadow-2xl
+              translate-x-full transition-transform duration-300 ease-out flex flex-col">
+
+  <header class="shrink-0 px-5 py-4 border-b border-desk-200 flex items-center justify-between">
+    <div>
+      <h2 class="font-display font-semibold text-lg text-ink-900">ข้อมูลลงรับหนังสือ</h2>
+      <p class="text-xs text-ink-500 mt-0.5">พิมพ์เลขอาราบิกได้เลย ระบบแปลงเป็นเลขไทยบนตราให้</p>
+    </div>
+    <button id="closeModalBtnFrm" class="w-9 h-9 rounded-lg hover:bg-desk-100 text-ink-500" aria-label="ปิด">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+  </header>
+
+  <form id="receiveForm" class="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+    <div class="grid grid-cols-2 gap-4">
+      <div class="field">
+        <label for="receive-number">เลขทะเบียนรับ</label>
+        <div class="flex gap-2">
+          <input type="text" id="receive-number" name="receive-number" class="font-mono" placeholder="0124" />
+          <button type="button" id="next-number-btn"
+                  class="hidden shrink-0 w-10 rounded-lg border border-desk-300 text-ink-600 hover:bg-ink-50 hover:border-ink-300 transition-colors"
+                  title="ขอเลขถัดไปจากทะเบียน">
+            <i class="fa-solid fa-hashtag"></i>
+          </button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="receive-date">วันที่รับ</label>
+        <input type="date" id="receive-date" name="receive-date" />
+      </div>
+      <div class="field">
+        <label for="book-number">เลขที่หนังสือ</label>
+        <input type="text" id="book-number" name="book-number" class="font-mono" placeholder="ศธ 04xxx/xxx" />
+      </div>
+      <div class="field">
+        <label for="book-date">หนังสือลงวันที่</label>
+        <input type="date" id="book-date" name="book-date" />
+      </div>
+      <div class="field">
+        <label for="fromInp">จาก</label>
+        <input type="text" id="fromInp" name="fromInp" />
+      </div>
+      <div class="field">
+        <label for="to">ถึง</label>
+        <input type="text" id="to" name="to" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="subject">เรื่อง</label>
+      <input type="text" id="subject" name="subject" />
+      <button type="button" id="ocr-button"
+              class="mt-2 inline-flex items-center gap-2 text-sm text-ink-600 hover:text-ink-900 font-medium">
+        <i class="fa-solid fa-wand-magic-sparkles"></i> สแกนหัวเรื่องจากหน้าแรกให้
+      </button>
+    </div>
+
+    <div class="field">
+      <label for="action">การปฏิบัติ</label>
+      <input type="text" id="action" name="action" />
+    </div>
+
+    <div class="field">
+      <label for="msgCommand">ข้อความเพิ่มเติมบนตราสั่งการ</label>
+      <input type="text" id="msgCommand" name="msgCommand" />
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div class="field">
+        <label for="department">ฝ่ายที่รับผิดชอบ</label>
+        <select id="department" name="department">
+          <option value="ฝ่ายงบประมาณ">ฝ่ายงบประมาณ</option>
+          <option value="ฝ่ายบริหารทั่วไป">ฝ่ายบริหารทั่วไป</option>
+          <option value="ฝ่ายวิชาการ">ฝ่ายวิชาการ</option>
+          <option value="ฝ่ายบุคลากร">ฝ่ายบุคลากร</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="commanded">การสั่งการ</label>
+        <select id="commanded" name="commanded">
+          <option value="เพื่อทราบ">เพื่อทราบ</option>
+          <option value="แจ้งบุคลากรให้ทราบ">แจ้งบุคลากรให้ทราบ</option>
+          <option value="เพื่อพิจารณาสั่งการ">เพื่อพิจารณาสั่งการ</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>ลิงก์สิ่งที่ส่งมาด้วย</label>
+      <div id="atthContainer" class="space-y-2">
+        <div class="flex gap-2">
+          <input type="text" name="atth_a" placeholder="https://" />
+        </div>
+      </div>
+      <div class="flex gap-4 mt-2">
+        <button type="button" id="add-atth-btn" class="text-sm text-ink-600 hover:text-ink-900 font-medium">+ เพิ่มช่อง</button>
+        <button type="button" id="remove-atth-btn" class="text-sm text-seal-500 hover:text-seal-600 font-medium">− ลบช่องท้าย</button>
+      </div>
+    </div>
+  </form>
+
+  <footer class="shrink-0 border-t border-desk-200 p-4 space-y-2 bg-desk-100">
+    <div class="grid grid-cols-2 gap-2">
+      <button type="button" id="form-stamp-receive-btn" class="btn-secondary">
+        <i class="fa-solid fa-stamp"></i> ประทับตรารับ
+      </button>
+      <button type="button" id="form-stamp-command-btn" class="btn-secondary">
+        <i class="fa-solid fa-stamp"></i> ประทับตราสั่งการ
+      </button>
+    </div>
+    <button type="submit" form="receiveForm" id="local-save-btn" class="btn-primary w-full">
+      <i class="fa-solid fa-file-arrow-down"></i> ดาวน์โหลด PDF พร้อมข้อมูล
+    </button>
+
+    <button type="button" id="cloud-save-btn" class="btn-primary w-full hidden">
+      <i class="fa-solid fa-cloud-arrow-up"></i> บันทึกลงทะเบียน + Drive
+    </button>
+
+    <button type="button" id="registry-btn"
+            class="hidden w-full text-center text-xs font-medium text-ink-500 hover:text-ink-900 pt-1">
+      ดูทะเบียนรับล่าสุด
+    </button>
+  </footer>
+</aside>
+
+<!-- ══════════════════════════ กล่องลายเซ็น ══════════════════════════ -->
+<div id="signatureModal" class="modal-backdrop hidden">
+  <div class="modal-card max-w-md">
+    <h2 class="font-display font-semibold text-lg mb-1">เซ็นชื่อ</h2>
+    <p class="text-sm text-ink-500 mb-4">เซ็นด้วยนิ้วหรือเมาส์ในกรอบด้านล่าง</p>
+
+    <div class="rounded-xl border-2 border-dashed border-desk-300 bg-desk-100/60 p-2">
+      <canvas id="signaturePad" class="w-full h-44 rounded-lg bg-white touch-none"></canvas>
+    </div>
+
+    <div class="flex gap-2 mt-4">
+      <button id="clearSignature" class="btn-ghost flex-1">ล้าง</button>
+      <button id="closeSignatureModal" class="btn-ghost flex-1">ปิด</button>
+      <button id="saveSignature" class="btn-primary flex-[1.4]">วางลายเซ็น</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ กล่องข้อความ ══════════════════════════ -->
+<div id="textModal" class="modal-backdrop hidden">
+  <div class="modal-card max-w-lg">
+    <h2 class="font-display font-semibold text-lg mb-1">เพิ่มข้อความ</h2>
+    <p class="text-sm text-ink-500 mb-4">จัดรูปแบบได้ แล้วนำไปวางบนเอกสารเป็นภาพ</p>
+
+    <div id="quillEditor" class="h-44 rounded-b-xl"></div>
+    <div id="renderArea" class="render-area"></div>
+
+    <div class="flex gap-2 mt-4">
+      <button id="closeTextModal" class="btn-ghost flex-1">ปิด</button>
+      <button id="insertTextBtn" class="btn-primary flex-[1.4]">วางข้อความ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ ตั้งค่าโรงเรียน ══════════════════════════ -->
+<div id="settingsModal" class="modal-backdrop hidden">
+  <div class="modal-card max-w-lg">
+    <div class="flex items-start justify-between mb-1">
+      <h2 class="font-display font-semibold text-lg">ตั้งค่าโรงเรียนและผู้บริหาร</h2>
+      <button id="closeSettingsModal" class="w-8 h-8 rounded-lg hover:bg-desk-100 text-ink-500" aria-label="ปิด">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <p class="text-sm text-ink-500 mb-2">ชื่อที่กรอกจะถูกนำไปใช้ทั้งหัวเว็บ ตรารับหนังสือ และตราลงนามทุกจุด</p>
+
+    <div class="flex items-start gap-2 mb-4 rounded-lg bg-desk-100 px-3 py-2">
+      <i class="fa-solid fa-database text-ink-400 text-xs mt-1"></i>
+      <p id="settings-storage-note" class="text-xs text-ink-500 flex-1">
+        ค่าเหล่านี้เก็บในชีต "ตั้งค่าหน่วยงาน" ทุกเครื่องที่เปิดระบบจะได้ค่าชุดเดียวกัน
+      </p>
+      <button type="button" id="pullSettingsBtn"
+              class="hidden shrink-0 text-xs font-medium text-ink-600 hover:text-ink-900 whitespace-nowrap">
+        ดึงค่าจากชีต
+      </button>
+    </div>
+
+    <form id="settingsForm" class="space-y-4 max-h-[58dvh] overflow-y-auto pr-1">
+      <div class="field">
+        <label for="set-school-name">ชื่อโรงเรียน</label>
+        <input type="text" id="set-school-name" placeholder="โรงเรียนชุมชนวัดไทยงาม" />
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div class="field">
+          <label for="set-director-name">ชื่อผู้อำนวยการ</label>
+          <input type="text" id="set-director-name" placeholder="นางสมคิด จันขุนทศ" />
+        </div>
+        <div class="field">
+          <label for="set-director-title">ตำแหน่ง ผอ.</label>
+          <input type="text" id="set-director-title" placeholder="ผู้อำนวยการ" />
+        </div>
+        <div class="field">
+          <label for="set-deputy-name">ชื่อรองผู้อำนวยการ</label>
+          <input type="text" id="set-deputy-name" placeholder="นายอธิชาติ ไทยธานี" />
+        </div>
+        <div class="field">
+          <label for="set-deputy-title">ตำแหน่ง รอง ผอ.</label>
+          <input type="text" id="set-deputy-title" placeholder="รองผู้อำนวยการ" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="set-logo-url">ลิงก์ภาพโลโก้โรงเรียน</label>
+        <input type="url" id="set-logo-url" placeholder="https://.../logo.png" />
+        <p class="text-xs text-ink-400 mt-1">วางลิงก์ภาพโดยตรง (.png .jpg) เว้นว่างไว้ได้ถ้าไม่ต้องการโลโก้</p>
+      </div>
+
+      <label class="flex items-start gap-2.5 text-sm text-ink-700 cursor-pointer">
+        <input type="checkbox" id="set-logo-on-stamp" class="mt-1 accent-ink-600" />
+        <span>
+          ใส่โลโก้บนตรารับหนังสือด้วย
+          <span class="block text-xs text-ink-400 mt-0.5">
+            ใช้ได้เฉพาะภาพที่อนุญาตให้ดึงข้ามเว็บ (CORS) ระบบจะตรวจให้ตอนกดบันทึก
+          </span>
+        </span>
+      </label>
+
+      <div class="rounded-xl bg-desk-100 p-3 flex items-center gap-3">
+        <img id="settings-logo-preview" alt=""
+             class="w-12 h-12 rounded-xl object-contain bg-white ring-1 ring-desk-300 p-1 shrink-0 hidden" />
+        <div class="min-w-0">
+          <p class="text-[11px] text-ink-400 mb-0.5">ตัวอย่างตราลงนาม</p>
+          <p id="settings-preview-name" class="text-sm text-ink-900">(นางสมคิด จันขุนทศ)</p>
+          <p id="settings-preview-position" class="text-xs text-ink-600">ผู้อำนวยการโรงเรียนชุมชนวัดไทยงาม</p>
+        </div>
+      </div>
+    </form>
+
+    <div class="flex gap-2 mt-4">
+      <button type="button" id="resetSettingsBtn" class="btn-ghost flex-1">ค่าเริ่มต้น</button>
+      <button type="button" id="cancelSettingsBtn" class="btn-ghost flex-1">ปิด</button>
+      <button type="submit" form="settingsForm" class="btn-primary flex-[1.4]">บันทึกการตั้งค่า</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ ผล QR ══════════════════════════ -->
+<div id="qrModal" class="modal-backdrop hidden">
+  <div class="modal-card max-w-md">
+    <div class="flex items-start justify-between mb-4">
+      <h2 class="font-display font-semibold text-lg">QR ที่พบในเอกสาร</h2>
+      <button id="closeQrModal" class="w-8 h-8 rounded-lg hover:bg-desk-100 text-ink-500" aria-label="ปิด">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div id="qrResults" class="space-y-2 max-h-72 overflow-y-auto"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ ทะเบียนรับล่าสุด ══════════════════════════ -->
+<div id="registryModal" class="modal-backdrop hidden">
+  <div class="modal-card max-w-2xl">
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <h2 class="font-display font-semibold text-lg">ทะเบียนรับล่าสุด</h2>
+        <p class="text-xs text-ink-500 mt-0.5">ดึงจากชีตทะเบียนรับ แสดง ๒๐ รายการหลังสุด</p>
+      </div>
+      <button id="closeRegistryModal" class="w-8 h-8 rounded-lg hover:bg-desk-100 text-ink-500" aria-label="ปิด">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div id="registryList" class="space-y-2 max-h-[60vh] overflow-y-auto"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ สถานะและแจ้งเตือน ══════════════════════════ -->
+<div id="loading" class="fixed inset-0 z-[70] bg-desk-100/90 backdrop-blur-sm hidden flex-col items-center justify-center gap-4">
+  <div class="w-12 h-12 rounded-full border-[3px] border-ink-200 border-t-ink-700 animate-spin"></div>
+  <p id="loading-text" class="text-sm font-medium text-ink-700">กำลังประมวลผล...</p>
+</div>
+
+<div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-24 md:bottom-8 z-[80] hidden">
+  <div id="toast-body" class="flex items-center gap-3 rounded-xl bg-ink-900 text-white text-sm px-4 py-3 shadow-pill max-w-[90vw]">
+    <i id="toast-icon" class="fa-solid fa-circle-check text-leaf-500"></i>
+    <span id="toast-text"></span>
+  </div>
+</div>
+
+<!-- ══════════════════════════ Libraries ══════════════════════════ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/3.0.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.1/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.6/dist/signature_pad.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
