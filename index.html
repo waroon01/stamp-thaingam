@@ -44,9 +44,56 @@
         crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 
 <body class="bg-desk-100 text-ink-900 antialiased">
+
+<!-- ══════════════════════════ ประตู LINE Login (LIFF) ══════════════════════════ -->
+<div id="liffGate" class="fixed inset-0 z-[100] flex items-center justify-center px-5 bg-ink-900">
+  <div aria-hidden="true" class="pointer-events-none absolute inset-0 opacity-70"
+       style="background:radial-gradient(120% 90% at 50% -10%, #2A4787 0%, #12203D 55%, #0B152A 100%)"></div>
+
+  <div class="relative w-full max-w-sm rounded-3xl bg-white shadow-2xl px-7 py-9 text-center">
+    <img id="gate-logo" alt=""
+         src="https://res.cloudinary.com/djkbdwnsc/image/upload/f_auto,q_auto,c_fit,h_132,w_132/v1786978522/next-fullStack/Logo-thaingam_1_k2iec7.png"
+         class="h-14 w-auto max-w-[4.5rem] object-contain mx-auto" />
+
+    <p id="gate-school" class="font-display font-semibold text-ink-900 mt-4">โรงเรียนชุมชนวัดไทยงาม</p>
+    <p class="text-xs text-ink-500 mt-0.5">งานสารบรรณ · ลงรับหนังสือราชการ</p>
+
+    <div class="my-6 h-px bg-desk-200"></div>
+
+    <div id="gate-spinner" class="w-10 h-10 mx-auto rounded-full border-[3px] border-ink-100 border-t-ink-700 animate-spin"></div>
+
+    <div id="gate-icon" class="hidden w-12 h-12 mx-auto rounded-2xl items-center justify-center text-xl">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+    </div>
+
+    <p id="gate-title" class="font-medium text-ink-900 mt-4">กำลังเชื่อมต่อ LINE</p>
+    <p id="gate-message" class="text-sm text-ink-500 mt-1 leading-relaxed">กรุณารอสักครู่ ระบบกำลังตรวจสอบการเข้าสู่ระบบ</p>
+
+    <div class="mt-6 space-y-2">
+      <button id="gate-login-btn" type="button"
+              class="hidden w-full items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold text-white
+                     transition-opacity hover:opacity-90" style="background:#06C755">
+        <i class="fa-brands fa-line text-lg"></i> เข้าสู่ระบบด้วย LINE
+      </button>
+
+      <button id="gate-retry-btn" type="button" class="hidden btn-secondary w-full">
+        <i class="fa-solid fa-rotate-right"></i> ลองเชื่อมต่อใหม่
+      </button>
+
+      <button id="gate-skip-btn" type="button"
+              class="hidden w-full text-xs font-medium text-ink-400 hover:text-ink-700 pt-1">
+        ข้ามไปก่อน (ใช้งานได้ แต่จะแชร์เข้า LINE ไม่ได้)
+      </button>
+    </div>
+
+    <p class="text-[11px] text-ink-300 mt-6 font-mono">LIFF · ระบบลงรับหนังสือ</p>
+  </div>
+</div>
 
 <!-- ══════════════════════════ หน้าเริ่มต้น ══════════════════════════ -->
 <main id="startSection" class="min-h-[100dvh] flex flex-col">
@@ -59,13 +106,54 @@
       <p class="text-xs text-ink-500">งานสารบรรณ · ลงรับหนังสือราชการ</p>
     </div>
 
-    <button id="openSettingsBtn"
-            class="ml-auto inline-flex items-center gap-2 rounded-lg border border-ink-200 px-3 h-9
-                   text-sm font-medium text-ink-600 hover:bg-ink-50 hover:border-ink-300 transition-colors"
-            title="ตั้งค่าชื่อโรงเรียนและผู้บริหาร">
-      <i class="fa-solid fa-gear"></i>
-      <span class="hidden sm:inline">ตั้งค่า</span>
-    </button>
+    <div class="ml-auto flex items-center gap-2">
+      <!-- โปรไฟล์ LINE -->
+      <div id="profileChip" class="hidden relative">
+        <button id="profileBtn" type="button"
+                class="flex items-center gap-2 rounded-full border border-ink-200 bg-white h-10 pl-1 pr-2 sm:pr-3
+                       hover:border-ink-300 hover:shadow-sm transition-all"
+                aria-haspopup="true" aria-expanded="false">
+          <span class="relative shrink-0">
+            <img id="profileAvatar" alt="" class="w-8 h-8 rounded-full object-cover bg-ink-100 ring-1 ring-ink-100" />
+            <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white" style="background:#06C755"></span>
+          </span>
+          <span class="hidden sm:block text-left leading-tight max-w-[9rem]">
+            <span id="profileName" class="block text-sm font-medium text-ink-900 truncate">—</span>
+            <span class="block text-[10px] text-ink-400 truncate">เข้าใช้งานด้วย LINE</span>
+          </span>
+          <i class="fa-solid fa-chevron-down text-[10px] text-ink-300 hidden sm:block"></i>
+        </button>
+
+        <div id="profileMenu"
+             class="hidden absolute right-0 top-12 z-50 w-64 rounded-2xl bg-white shadow-page border border-desk-200 p-4">
+          <div class="flex items-center gap-3">
+            <img id="profileMenuAvatar" alt="" class="w-11 h-11 rounded-full object-cover bg-ink-100 ring-1 ring-ink-100 shrink-0" />
+            <div class="min-w-0">
+              <p id="profileMenuName" class="text-sm font-medium text-ink-900 truncate">—</p>
+              <p id="profileMenuStatus" class="text-xs text-ink-400 truncate">—</p>
+            </div>
+          </div>
+          <div class="my-3 h-px bg-desk-200"></div>
+          <p class="text-[11px] text-ink-400 leading-relaxed">
+            แชร์เอกสารที่ประทับตราแล้วเข้าแชทหรือกลุ่มไลน์ได้จากปุ่ม
+            <span class="whitespace-nowrap font-medium text-ink-600">แชร์เข้า LINE</span>
+          </p>
+          <button id="profileLogoutBtn" type="button"
+                  class="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-lg border border-desk-300 px-3 h-9
+                         text-sm font-medium text-seal-500 hover:bg-seal-500/5 hover:border-seal-500/40 transition-colors">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i> ออกจากระบบ
+          </button>
+        </div>
+      </div>
+
+      <button id="openSettingsBtn"
+              class="inline-flex items-center gap-2 rounded-lg border border-ink-200 px-3 h-9
+                     text-sm font-medium text-ink-600 hover:bg-ink-50 hover:border-ink-300 transition-colors"
+              title="ตั้งค่าชื่อโรงเรียนและผู้บริหาร">
+        <i class="fa-solid fa-gear"></i>
+        <span class="hidden sm:inline">ตั้งค่า</span>
+      </button>
+    </div>
   </header>
 
   <div class="flex-1 grid lg:grid-cols-[1.05fr,1fr] gap-10 lg:gap-16 items-center px-5 sm:px-8 lg:px-16 pb-12 max-w-7xl mx-auto w-full">
@@ -77,7 +165,7 @@
         ทำงานในเครื่องคุณ สามารถส่งไฟล์ขึ้นเซิร์ฟเวอร์เก็บไว้และบันทึกค่าต่างๆ ได้
       </p>
 
-      <h1 class="font-display text-3xl sm:text-4xl lg:text-[2.75rem] leading-[1.25] font-bold text-ink-900">
+      <h1 class="font-display text-3xl sm:text-4xl lg:text-[2.75rem] leading-[1.45] sm:leading-[1.45] lg:leading-[1.45] font-bold text-ink-900">
         ประทับตรารับหนังสือ<br class="hidden sm:block" />
         พร้อมบันทึกพิจารณาสั่งการได้
       </h1>
@@ -181,12 +269,20 @@
         <button id="print-pdf-btn" class="topbar-btn" title="พิมพ์" aria-label="พิมพ์">
           <i class="fa-solid fa-print"></i>
         </button>
+        <button id="share-line-btn" class="topbar-btn" title="แชร์เข้า LINE" aria-label="แชร์เข้า LINE">
+          <i class="fa-brands fa-line text-lg" style="color:#06C755"></i>
+        </button>
         <button id="export-pdf-btn"
                 class="ml-1 inline-flex items-center gap-2 rounded-lg bg-white text-ink-900 px-3 sm:px-4 h-9
                        text-sm font-semibold hover:bg-ink-100 transition-colors">
           <i class="fa-solid fa-file-arrow-down"></i>
           <span class="hidden sm:inline">ดาวน์โหลด PDF</span>
         </button>
+
+        <span id="topbarProfile" class="hidden items-center gap-2 ml-1 sm:ml-2 sm:pl-3 sm:border-l border-white/15">
+          <img id="profileAvatarTop" alt="" class="w-8 h-8 rounded-full object-cover bg-ink-700 ring-1 ring-white/25" />
+          <span id="profileNameTop" class="hidden lg:block text-xs text-ink-200 max-w-[8rem] truncate"></span>
+        </span>
       </div>
     </div>
   </header>
@@ -541,10 +637,12 @@
     </div>
 
     <div class="field">
-      <label>ลิงก์สิ่งที่ส่งมาด้วย</label>
+      <label>สิ่งที่ส่งมาด้วย</label>
+      <p class="text-[11px] text-ink-400 -mt-1 mb-2">ชื่อและลิงก์ที่กรอกไว้จะกลายเป็นปุ่มให้ผู้รับกดเปิดใน LINE</p>
       <div id="atthContainer" class="space-y-2">
         <div class="flex gap-2">
-          <input type="text" name="atth_a" placeholder="https://" />
+          <input type="text" name="atth_label" placeholder="ชื่อรายการ" class="basis-[38%] shrink-0" />
+          <input type="text" name="atth_a" placeholder="https://" class="flex-1 min-w-0" />
         </div>
       </div>
       <div class="flex gap-4 mt-2">
@@ -567,9 +665,17 @@
       <i class="fa-solid fa-file-arrow-down"></i> ดาวน์โหลด PDF พร้อมข้อมูล
     </button>
 
-    <button type="button" id="cloud-save-btn" class="btn-primary w-full hidden">
-      <i class="fa-solid fa-cloud-arrow-up"></i> บันทึกลงทะเบียน + Drive
-    </button>
+    <div class="flex gap-2">
+      <button type="button" id="cloud-save-btn" class="btn-primary w-full hidden">
+        <i class="fa-solid fa-cloud-arrow-up"></i> บันทึกลงทะเบียน
+      </button>
+
+      <button type="button" id="share-line-form-btn"
+              class="w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-semibold text-white
+                     transition-opacity hover:opacity-90" style="background:#06C755">
+        <i class="fa-brands fa-line text-lg"></i> แชร์เข้า LINE
+      </button>
+    </div>
 
     <button type="button" id="registry-btn"
             class="hidden w-full text-center text-xs font-medium text-ink-500 hover:text-ink-900 pt-1">
@@ -694,6 +800,67 @@
   </div>
 </div>
 
+<!-- ══════════════════════════ แชร์เข้า LINE ══════════════════════════ -->
+<div id="shareModal" class="modal-backdrop hidden">
+  <div class="modal-card max-w-md max-h-[92dvh] overflow-y-auto">
+    <div class="flex items-start justify-between mb-1">
+      <div>
+        <h2 class="font-display font-semibold text-lg">แชร์เอกสารเข้า LINE</h2>
+        <p class="text-xs text-ink-500 mt-0.5">ระบบจะอัปโหลด PDF ที่ประทับตราแล้วขึ้น Drive แล้วส่งเป็นการ์ดข้อมูลลงรับ</p>
+      </div>
+      <button id="closeShareModal" class="w-8 h-8 rounded-lg hover:bg-desk-100 text-ink-500 shrink-0" aria-label="ปิด">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <!-- ตัวอย่างการ์ดที่ผู้รับจะเห็น -->
+    <p class="text-[11px] font-medium text-ink-400 mt-4 mb-2">ตัวอย่างการ์ดที่ผู้รับจะเห็น</p>
+    <div class="rounded-2xl bg-desk-200 p-3 max-h-[40dvh] overflow-y-auto">
+      <div id="sharePreview" class="mx-auto w-full max-w-[19rem]"></div>
+    </div>
+
+    <div class="mt-4 space-y-2">
+      <label class="flex items-start gap-2.5 text-sm text-ink-700 cursor-pointer">
+        <input type="checkbox" id="share-save-sheet" class="mt-1 accent-ink-600" />
+        <span>
+          บันทึกลงทะเบียนรับด้วย
+          <span class="block text-xs text-ink-400 mt-0.5">เพิ่มหนึ่งแถวในชีตทะเบียน พร้อมลิงก์ไฟล์</span>
+        </span>
+      </label>
+
+      <label id="share-reupload-row" class="hidden items-start gap-2.5 text-sm text-ink-700 cursor-pointer">
+        <input type="checkbox" id="share-reupload" class="mt-1 accent-ink-600" />
+        <span>
+          อัปโหลดไฟล์ใหม่อีกครั้ง
+          <span class="block text-xs text-ink-400 mt-0.5">ไม่ติ๊ก = ใช้ลิงก์ไฟล์ที่เพิ่งอัปโหลดไปเมื่อครู่</span>
+        </span>
+      </label>
+    </div>
+
+    <div id="share-status" class="mt-3 flex items-center gap-2.5 rounded-lg bg-desk-100 px-3 py-2.5 text-xs text-ink-600">
+      <span id="share-status-spinner" class="hidden shrink-0 w-3.5 h-3.5 rounded-full border-2 border-ink-200 border-t-ink-600 animate-spin"></span>
+      <i id="share-status-icon" class="hidden shrink-0 fa-solid fa-circle-check text-leaf-500"></i>
+      <span id="share-status-text" class="flex-1 leading-relaxed"></span>
+    </div>
+
+    <p id="share-warning" class="hidden mt-3 rounded-lg bg-seal-500/5 border border-seal-500/30 px-3 py-2 text-xs text-seal-500"></p>
+
+    <p class="text-[11px] text-ink-400 leading-relaxed mt-3">
+      ผู้รับจะเปิดไฟล์ได้ก็ต่อเมื่อ <span class="font-mono">SHARE_WITH_ANYONE</span> ใน <span class="font-mono">Code.gs</span>
+      ตั้งเป็น <span class="font-mono">true</span> ไว้แล้ว
+    </p>
+
+    <div class="flex gap-2 mt-4">
+      <button type="button" id="cancelShareBtn" class="btn-ghost flex-1">ปิด</button>
+      <button type="button" id="doShareBtn"
+              class="flex-[1.6] inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold text-white
+                     transition-opacity hover:opacity-90 disabled:opacity-50" style="background:#06C755">
+        <i class="fa-brands fa-line text-lg"></i> เลือกผู้รับใน LINE
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════════ ผล QR ══════════════════════════ -->
 <div id="qrModal" class="modal-backdrop hidden">
   <div class="modal-card max-w-md">
@@ -746,5 +913,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
 <script src="app.js"></script>
+<script src="flex-doc.js"></script>
+<script src="liff-share.js"></script>
 </body>
 </html>

@@ -241,20 +241,24 @@ function setTextIfExists(id, value) {
 function applyOrgSettings() {
   document.title = `ระบบลงรับหนังสือ · ${org.schoolName}`;
   setTextIfExists('brand-school', org.schoolName);
+  setTextIfExists('gate-school', org.schoolName);
 
-  const brandLogo = $('brand-logo');
-  if (brandLogo) {
+  // หัวเว็บและหน้าจอเข้าสู่ระบบใช้โลโก้ชุดเดียวกัน
+  ['brand-logo', 'gate-logo'].forEach((id) => {
+    const logo = $(id);
+    if (!logo) return;
+
     if (org.logoUrl) {
       // ลิงก์เสียให้ซ่อนไปเลย ดีกว่าโชว์ไอคอนภาพแตกคาหัวเว็บ
-      brandLogo.onerror = () => brandLogo.classList.add('hidden');
-      brandLogo.onload = () => brandLogo.classList.remove('hidden');
-      brandLogo.src = sizedLogoUrl(org.logoUrl, 132);   // กรอบสูง 44 px เผื่อจอความละเอียดสูง 3 เท่า
-      brandLogo.classList.remove('hidden');
+      logo.onerror = () => logo.classList.add('hidden');
+      logo.onload = () => logo.classList.remove('hidden');
+      logo.src = sizedLogoUrl(org.logoUrl, 132);   // กรอบสูง 44 px เผื่อจอความละเอียดสูง 3 เท่า
+      logo.classList.remove('hidden');
     } else {
-      brandLogo.removeAttribute('src');
-      brandLogo.classList.add('hidden');
+      logo.removeAttribute('src');
+      logo.classList.add('hidden');
     }
-  }
+  });
 
   setTextIfExists('card-director-name', nameInParens(org.directorName) || '(ยังไม่ได้ตั้งชื่อ)');
   setTextIfExists('card-director-title', org.directorTitle);
@@ -1465,28 +1469,38 @@ receiveBackdrop.addEventListener('click', closeDrawer);
 
 $('add-atth-btn').addEventListener('click', () => {
   const wrap = $('atthContainer');
-  if (wrap.querySelectorAll('input').length >= MAX_ATTH_INPUTS) {
+  if (wrap.querySelectorAll('input[name="atth_a"]').length >= MAX_ATTH_INPUTS) {
     toast(`เพิ่มได้สูงสุด ${MAX_ATTH_INPUTS} ช่อง`, 'info');
     return;
   }
   const div = document.createElement('div');
   div.className = 'flex gap-2';
-  div.innerHTML = '<input type="text" name="atth_a" placeholder="https://" />';
+  div.innerHTML =
+    '<input type="text" name="atth_label" placeholder="ชื่อรายการ" class="basis-[38%] shrink-0" />' +
+    '<input type="text" name="atth_a" placeholder="https://" class="flex-1 min-w-0" />';
   wrap.appendChild(div);
 });
 
 $('remove-atth-btn').addEventListener('click', () => {
   const wrap = $('atthContainer');
-  const inputs = wrap.querySelectorAll('input');
-  if (inputs.length > 1) wrap.removeChild(inputs[inputs.length - 1].parentElement);
+  const rows = wrap.querySelectorAll('input[name="atth_a"]');
+  if (rows.length > 1) wrap.removeChild(rows[rows.length - 1].parentElement);
 });
 
 function collectFormData() {
-  const atthUrls = Array.from(document.querySelectorAll('input[name="atth_a"]'))
-    .map((i) => i.value.trim())
-    .filter(Boolean);
+  // จับคู่ชื่อรายการกับลิงก์ตามลำดับช่อง แล้วตัดแถวที่ยังไม่ได้ใส่ลิงก์ทิ้ง
+  const labelInputs = Array.from(document.querySelectorAll('input[name="atth_label"]'));
+  const attachments = Array.from(document.querySelectorAll('input[name="atth_a"]'))
+    .map((input, index) => ({
+      label: (labelInputs[index] ? labelInputs[index].value : '').trim(),
+      url: input.value.trim()
+    }))
+    .filter((item) => item.url);
+
+  const atthUrls = attachments.map((item) => item.url);
 
   return {
+    attachments,
     receiveNumber: $('receive-number').value,
     bookNumber: $('book-number').value,
     fromInp: $('fromInp').value,
@@ -1499,6 +1513,7 @@ function collectFormData() {
     department: $('department').value,
     commanded: $('commanded').value,
     atth_a: atthUrls,
+    atth_labels: attachments.map((item) => item.label),
     savedAt: new Date().toISOString()
   };
 }

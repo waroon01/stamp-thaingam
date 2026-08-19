@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#146049" />
+  <title>ส่งต่อเอกสาร · ระบบลงรับหนังสือ</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: {
+              50:  '#F2F5FB', 100: '#E1E8F5', 200: '#C3D0EA', 300: '#93A9D5',
+              400: '#5E7BBB', 500: '#3A5B9E', 600: '#2A4787', 700: '#1F3568',
+              800: '#182A50', 900: '#12203D', 950: '#0B152A'
+            },
+            seal:  { 400: '#D0665F', 500: '#B23A34', 600: '#932A25', 700: '#75211D' },
+            desk:  { 100: '#F1F3F8', 200: '#E4E8F1', 300: '#D3D9E6' },
+            leaf:  { 500: '#1B7A5A', 600: '#146049' }
+          },
+          fontFamily: {
+            sans:    ['Sarabun', 'system-ui', 'sans-serif'],
+            display: ['"Noto Serif Thai"', 'Georgia', 'serif'],
+            mono:    ['"IBM Plex Mono"', 'ui-monospace', 'monospace']
+          },
+          boxShadow: {
+            page:  '0 1px 2px rgba(18,32,61,.08), 0 12px 28px -12px rgba(18,32,61,.28)',
+            panel: '0 -8px 30px -12px rgba(18,32,61,.35)',
+            pill:  '0 6px 24px -8px rgba(18,32,61,.45)'
+          }
+        }
+      }
+    }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Noto+Serif+Thai:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+        integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="style.css" />
+
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+
+<body class="bg-desk-100 text-ink-900 antialiased">
+
+<!-- ══════════════════════════ ประตู LINE Login (LIFF) ══════════════════════════ -->
+<div id="liffGate" class="fixed inset-0 z-[100] flex items-center justify-center px-5" style="background:#0E3D30">
+  <div aria-hidden="true" class="pointer-events-none absolute inset-0 opacity-80"
+       style="background:radial-gradient(120% 90% at 50% -10%, #1B7A5A 0%, #146049 55%, #0B2E25 100%)"></div>
+
+  <div class="relative w-full max-w-sm rounded-3xl bg-white shadow-2xl px-7 py-9 text-center">
+    <span class="inline-flex items-center justify-center w-14 h-14 rounded-2xl text-2xl"
+          style="background:#EDF6F2;color:#146049">
+      <i class="fa-solid fa-share-nodes"></i>
+    </span>
+
+    <p class="font-display font-semibold text-ink-900 mt-4">ส่งต่อเอกสารลงรับ</p>
+    <p class="text-xs text-ink-500 mt-0.5">งานสารบรรณ · หนังสือราชการ</p>
+
+    <div class="my-6 h-px bg-desk-200"></div>
+
+    <div id="gate-spinner" class="w-10 h-10 mx-auto rounded-full border-[3px] border-ink-100 border-t-ink-700 animate-spin"></div>
+
+    <div id="gate-icon" class="hidden w-12 h-12 mx-auto rounded-2xl items-center justify-center text-xl">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+    </div>
+
+    <p id="gate-title" class="font-medium text-ink-900 mt-4">กำลังเชื่อมต่อ LINE</p>
+    <p id="gate-message" class="text-sm text-ink-500 mt-1 leading-relaxed">กรุณารอสักครู่ ระบบกำลังอ่านข้อมูลการ์ด</p>
+
+    <div class="mt-6 space-y-2">
+      <button id="gate-login-btn" type="button"
+              class="hidden w-full items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold text-white
+                     transition-opacity hover:opacity-90" style="background:#06C755">
+        <i class="fa-brands fa-line text-lg"></i> เข้าสู่ระบบด้วย LINE
+      </button>
+
+      <button id="gate-retry-btn" type="button" class="hidden btn-secondary w-full">
+        <i class="fa-solid fa-rotate-right"></i> ลองใหม่อีกครั้ง
+      </button>
+    </div>
+
+    <p class="text-[11px] text-ink-300 mt-6 font-mono">LIFF · ส่งต่อเอกสาร</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════ หัวเว็บ ══════════════════════════ -->
+<header class="sticky top-0 z-20 text-white" style="background:#146049">
+  <div class="h-14 px-4 flex items-center gap-3 max-w-lg mx-auto">
+    <span class="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+      <i class="fa-solid fa-share-nodes"></i>
+    </span>
+    <div class="min-w-0 flex-1 leading-tight">
+      <p class="text-sm font-medium truncate">ส่งต่อเอกสารลงรับ</p>
+      <p class="text-[11px] truncate" style="color:#A9D9C6">เพิ่มข้อสั่งการแล้วเลือกผู้รับได้เลย</p>
+    </div>
+
+    <span id="topbarProfile" class="hidden items-center gap-2 pl-3 border-l border-white/15">
+      <img id="profileAvatarTop" alt="" class="w-8 h-8 rounded-full object-cover ring-1 ring-white/25" style="background:#1B7A5A" />
+      <span id="profileNameTop" class="hidden sm:block text-xs max-w-[7rem] truncate" style="color:#A9D9C6"></span>
+    </span>
+  </div>
+</header>
+
+<!-- ══════════════════════════ การ์ด ══════════════════════════ -->
+<main class="px-4 py-6 pb-40 max-w-lg mx-auto">
+  <p class="text-[11px] font-medium text-ink-400 mb-2 text-center">การ์ดที่ผู้รับจะเห็น</p>
+  <div id="cardBox" class="mx-auto w-full max-w-[19rem]"></div>
+
+  <section id="notePanel" class="hidden mx-auto w-full max-w-[19rem] mt-5 rounded-2xl bg-white shadow-page p-4">
+    <label for="noteInput" class="block text-sm font-medium text-ink-900">ข้อสั่งการ / บันทึกเพิ่มเติม</label>
+    <p class="text-[11px] text-ink-400 mt-0.5 leading-relaxed">
+      พิมพ์แล้วจะไปแสดงเป็นกล่องสีเขียวอ่อนบนการ์ดที่ผู้รับได้รับ เว้นว่างไว้ก็ได้
+    </p>
+
+    <textarea id="noteInput" rows="3" maxlength="300"
+              placeholder="เช่น เรียน ครูวิชาการ โปรดดำเนินการภายในวันศุกร์นี้"
+              class="mt-2 w-full rounded-lg border border-desk-300 px-3 py-2 text-sm text-ink-900 leading-relaxed
+                     focus:outline-none focus:border-leaf-500 focus:ring-2 focus:ring-leaf-500/20 resize-y"></textarea>
+
+    <div class="flex items-center justify-between mt-1.5">
+      <span id="noteBy" class="text-[11px] text-ink-400 truncate"></span>
+      <span id="noteCount" class="text-[11px] font-mono text-ink-400 shrink-0">๐/๓๐๐</span>
+    </div>
+  </section>
+
+  <div id="cardError" class="hidden mx-auto w-full max-w-[19rem] rounded-2xl bg-white shadow-page px-5 py-8 text-center">
+    <span class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-seal-500/10 text-seal-500 text-xl">
+      <i class="fa-solid fa-link-slash"></i>
+    </span>
+    <p class="font-medium text-ink-900 mt-4">เปิดการ์ดนี้ไม่ได้</p>
+    <p id="cardErrorText" class="text-sm text-ink-500 mt-1 leading-relaxed">ลิงก์ไม่มีข้อมูลเอกสารติดมาด้วย</p>
+    <a id="openAppLink" href="./"
+       class="mt-5 inline-flex items-center justify-center gap-2 rounded-xl border border-desk-300 px-4 h-10
+              text-sm font-medium text-ink-700 hover:bg-ink-50">
+      <i class="fa-solid fa-stamp"></i> เปิดระบบลงรับหนังสือ
+    </a>
+  </div>
+</main>
+
+<!-- ══════════════════════════ แถบปุ่มล่าง ══════════════════════════ -->
+<div id="actionBar" class="hidden fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t border-desk-200">
+  <div class="max-w-lg mx-auto px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-2">
+    <button id="forwardBtn" type="button"
+            class="w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 font-semibold text-white
+                   transition-opacity hover:opacity-90 disabled:opacity-50" style="background:#06C755">
+      <i class="fa-brands fa-line text-lg"></i> ส่งต่อให้คนอื่น
+    </button>
+
+    <div class="flex gap-2">
+      <a id="openPdfBtn" href="#" target="_blank" rel="noopener noreferrer"
+         class="hidden flex-1 items-center justify-center gap-2 rounded-xl border border-desk-300 px-4 h-11
+                text-sm font-medium text-ink-700 hover:bg-ink-50">
+        <i class="fa-solid fa-file-pdf"></i> เปิด PDF
+      </a>
+      <button id="closeWindowBtn" type="button"
+              class="hidden flex-1 items-center justify-center gap-2 rounded-xl border border-desk-300 px-4 h-11
+                     text-sm font-medium text-ink-700 hover:bg-ink-50">
+        <i class="fa-solid fa-xmark"></i> ปิดหน้าต่าง
+      </button>
+    </div>
+
+    <p id="forwardWarn" class="hidden text-[11px] text-ink-400 leading-relaxed text-center"></p>
+  </div>
+</div>
+
+<!-- ══════════════════════════ แจ้งเตือน ══════════════════════════ -->
+<div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-32 z-[80] hidden">
+  <div class="flex items-center gap-3 rounded-xl bg-ink-900 text-white text-sm px-4 py-3 shadow-pill max-w-[90vw]">
+    <i id="toast-icon" class="fa-solid fa-circle-check text-leaf-500"></i>
+    <span id="toast-text"></span>
+  </div>
+</div>
+
+<script src="flex-doc.js"></script>
+<script src="share.js"></script>
+</body>
+</html>

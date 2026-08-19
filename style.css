@@ -291,14 +291,16 @@ body {
   display: inline-block;
   width: max-content;
   max-width: 600px;
-  padding: 2px 4px;
+  /* เว้นบน-ล่างให้พอกับสระบน/สระล่างของไทย ไม่งั้น html2canvas จะครอบตัดหาย */
+  padding: 6px 4px;
+  line-height: 1.75;
   white-space: pre-wrap;
   word-break: break-word;
   overflow: visible;
 }
 
 .render-area .ql-editor p,
-.render-area .ql-editor li { white-space: pre-wrap; }
+.render-area .ql-editor li { white-space: pre-wrap; line-height: 1.75; }
 
 /* ── ตัวแก้ไขข้อความ Quill ──────────────────────────────────────── */
 .ql-toolbar.ql-snow {
@@ -310,6 +312,11 @@ body {
   border-radius: 0 0 .75rem .75rem;
   font-family: 'Sarabun', sans-serif;
 }
+
+/* ให้ช่องพิมพ์มีระยะบรรทัดเท่ากับตอนแปลงเป็นภาพ จะได้เห็นตรงกับผลจริง */
+#quillEditor .ql-editor,
+#quillEditor .ql-editor p,
+#quillEditor .ql-editor li { line-height: 1.75; }
 
 /* ── แถบเลื่อน ──────────────────────────────────────────────────── */
 #container-warper::-webkit-scrollbar,

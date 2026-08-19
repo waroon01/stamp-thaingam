@@ -117,8 +117,10 @@ function doPost(e) {
  */
 function saveDocument(body) {
   const data = body.data || {};
-  let fileUrl = '';
-  let fileId = '';
+
+  // แชร์เข้า LINE จะอัปโหลดไฟล์ไปก่อนแล้ว รอบบันทึกลงทะเบียนจึงส่งมาแต่ลิงก์เดิม
+  let fileUrl = body.fileUrl || '';
+  let fileId = body.fileId || '';
 
   if (body.pdfBase64) {
     const filename = body.filename || ('รับหนังสือ_' + nowStamp() + '.pdf');
@@ -155,7 +157,7 @@ function saveDocument(body) {
         data.commanded || '',
         data.msgCommand || '',
         fileUrl,
-        (data.atth_a || []).join('\n'),
+        formatAttachments(data),
         body.filename || ''
       ]);
       row = sheet.getLastRow();
@@ -165,6 +167,17 @@ function saveDocument(body) {
   }
 
   return { ok: true, fileUrl: fileUrl, fileId: fileId, row: row };
+}
+
+/** สิ่งที่ส่งมาด้วย เขียนเป็น "ชื่อรายการ · ลิงก์" บรรทัดละรายการ */
+function formatAttachments(data) {
+  const urls = data.atth_a || [];
+  const labels = data.atth_labels || [];
+
+  return urls.map(function (url, index) {
+    const label = String(labels[index] || '').trim();
+    return label ? (label + ' · ' + url) : url;
+  }).join('\n');
 }
 
 /** เลขทะเบียนถัดไป โดยดูเลขสูงสุดที่มีอยู่ในชีต */
