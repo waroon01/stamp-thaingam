@@ -156,10 +156,13 @@
     </div>
   </header>
 
-  <div class="flex-1 grid lg:grid-cols-[1.05fr,1fr] gap-10 lg:gap-16 items-center px-5 sm:px-8 lg:px-16 pb-12 max-w-7xl mx-auto w-full">
+  <div class="flex-1 flex flex-col px-5 sm:px-8 lg:px-16 pb-12 max-w-7xl mx-auto w-full">
 
-    <!-- ซ้าย: สาระ -->
-    <section>
+   <div class="flex-1 grid lg:grid-cols-[1.05fr,1fr] gap-10 lg:gap-16 items-center">
+
+    <!-- ซ้าย: สาระ
+         min-w-0 สำคัญ ไม่ใส่แล้วเนื้อหายาว ๆ ในคอลัมน์จะดันความกว้างจนอีกฝั่งถูกบีบ -->
+    <section class="min-w-0">
       <p class="inline-flex items-center gap-2 text-xs font-medium tracking-wide text-ink-600 bg-ink-100 rounded-full px-3 py-1 mb-5">
         <span class="w-1.5 h-1.5 rounded-full bg-leaf-500"></span>
         ทำงานในเครื่องคุณ สามารถส่งไฟล์ขึ้นเซิร์ฟเวอร์เก็บไว้และบันทึกค่าต่างๆ ได้
@@ -192,7 +195,7 @@
     </section>
 
     <!-- ขวา: จุดเริ่มงาน -->
-    <section class="relative">
+    <section class="relative min-w-0">
       <!-- ตรายางประกอบ -->
       <div aria-hidden="true"
            class="hidden sm:block absolute -top-8 -right-2 lg:-right-6 rotate-[-8deg] select-none pointer-events-none z-10">
@@ -233,23 +236,32 @@
           เปิดงานที่บันทึกค้างไว้
         </button>
       </div>
-
-      <!-- ทะเบียนล่าสุดจากชีต ซ่อนไว้จนกว่าจะพบว่าตั้งค่า CLOUD ไว้แล้ว -->
-      <div id="homeRegistry" class="hidden mt-6 bg-white rounded-2xl shadow-page p-6 sm:p-8">
-        <div class="flex items-start justify-between gap-3 mb-4">
-          <div>
-            <h2 class="font-display font-semibold text-ink-900">ทะเบียนรับล่าสุด</h2>
-            <p class="text-xs text-ink-500 mt-0.5">กด “แก้ไข” เพื่อดึงค่าที่บันทึกไว้กลับมาลงฟอร์ม</p>
-          </div>
-          <button id="homeRegistryRefresh" type="button"
-                  class="shrink-0 w-9 h-9 rounded-lg text-ink-500 hover:bg-ink-50 hover:text-ink-900 transition-colors"
-                  title="โหลดใหม่" aria-label="โหลดทะเบียนใหม่">
-            <i class="fa-solid fa-rotate-right text-sm"></i>
-          </button>
-        </div>
-        <div id="homeRegistryList" class="space-y-2 max-h-[24rem] overflow-y-auto -mx-1 px-1"></div>
-      </div>
     </section>
+   </div>
+
+   <!-- ทะเบียนล่าสุดจากชีต เต็มความกว้าง ซ่อนไว้จนกว่าจะพบว่าตั้งค่า CLOUD ไว้แล้ว -->
+   <section id="homeRegistry" class="hidden mt-12 lg:mt-16 bg-white rounded-2xl shadow-page p-6 sm:p-8">
+     <div class="flex items-start justify-between gap-3 mb-4">
+       <div class="min-w-0">
+         <h2 class="font-display font-semibold text-lg text-ink-900">ทะเบียนรับล่าสุด</h2>
+         <p class="text-xs text-ink-500 mt-0.5">กด “แก้ไข” เพื่อดึงค่าที่บันทึกไว้กลับมาลงฟอร์ม</p>
+       </div>
+       <button id="homeRegistryRefresh" type="button"
+               class="shrink-0 w-9 h-9 rounded-lg text-ink-500 hover:bg-ink-50 hover:text-ink-900 transition-colors"
+               title="โหลดใหม่" aria-label="โหลดทะเบียนใหม่">
+         <i class="fa-solid fa-rotate-right text-sm"></i>
+       </button>
+     </div>
+
+     <!-- หัวตาราง โผล่เฉพาะจอกว้างที่แถวเรียงเป็นคอลัมน์ได้จริง -->
+     <div id="homeRegistryHead"
+          class="hidden lg:grid grid-cols-[6rem_7.5rem_minmax(0,1fr)_12rem_7.5rem] gap-x-5 items-center
+                 px-4 pb-2 mb-1 border-x border-transparent border-b-desk-200 border-b text-[11px] font-medium text-ink-400">
+       <span>เลขที่รับ</span><span>วันที่รับ</span><span>เรื่อง</span><span>จาก · ฝ่าย</span><span></span>
+     </div>
+
+     <div id="homeRegistryList" class="space-y-2 max-h-[26rem] overflow-y-auto -mx-1 px-1"></div>
+   </section>
   </div>
 </main>
 

@@ -2257,32 +2257,54 @@ function escapeHtml(value) {
 
 /* ── รายการทะเบียน ─────────────────────────────────────────── */
 
-/** วาดรายการทะเบียนหนึ่งชุด ใช้ร่วมกันทั้งหน้าแรกและกล่องในหน้าทำงาน */
-function renderRegistryRows(rows, target) {
+/**
+ * วาดรายการทะเบียนหนึ่งชุด ใช้ร่วมกันทั้งหน้าแรกและกล่องในหน้าทำงาน
+ *
+ * หน้าแรกกว้างเต็มจอ จัดเป็นคอลัมน์แบบตารางได้ตั้งแต่ lg ขึ้นไป
+ * ส่วนกล่องในหน้าทำงานกว้างแค่ max-w-2xl ต่อให้จอกว้างก็จัดคอลัมน์ไม่ไหว
+ * จึงเรียงลงมาเป็นบรรทัดพร้อมป้ายกำกับเสมอ (breakpoint ของ Tailwind
+ * วัดจากขนาดจอ ไม่ได้วัดจากความกว้างกล่อง จึงต้องแยกด้วยตัวแปรเอง)
+ */
+function renderRegistryRows(rows, target, { wide = false } = {}) {
+  const rowClass = wide
+    ? 'grid gap-x-5 gap-y-1 items-center lg:grid-cols-[6rem_7.5rem_minmax(0,1fr)_12rem_7.5rem]'
+    : 'grid gap-x-5 gap-y-1';
+
+  // จอกว้างมีหัวตารางอยู่แล้ว ป้ายกำกับในแถวจึงซ่อนได้
+  const labelClass = wide ? 'lg:hidden text-ink-400' : 'text-ink-400';
+
   target.innerHTML = '';
 
   rows.forEach((row) => {
     const item = document.createElement('div');
-    item.className = 'rounded-xl border border-desk-300 px-4 py-3 hover:border-ink-300 transition-colors';
+    item.className =
+      'rounded-xl border border-desk-300 px-4 py-3 hover:border-ink-300 hover:bg-ink-50/40 transition-colors ' + rowClass;
+
     item.innerHTML = `
-      <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <p class="font-mono text-xs text-ink-500">
-            เลขที่รับ ${toThaiDigits(row.receiveNumber) || '-'} · รับเมื่อ ${formatThaiDate(row.receiveDate) || '-'}
-          </p>
-          <p class="text-sm text-ink-900 font-medium mt-0.5 truncate">${escapeHtml(row.subject) || '(ไม่ระบุเรื่อง)'}</p>
-          <p class="text-xs text-ink-500 mt-0.5 truncate">จาก ${escapeHtml(row.from) || '-'} · ${escapeHtml(row.department) || '-'}</p>
-        </div>
-        <div class="shrink-0 flex items-center gap-1">
-          ${row.fileUrl ? `<a href="${escapeHtml(row.fileUrl)}" target="_blank" rel="noopener noreferrer"
-              class="w-8 h-8 rounded-lg inline-flex items-center justify-center text-ink-500 hover:bg-ink-50 hover:text-ink-900"
-              title="เปิดไฟล์ PDF"><i class="fa-solid fa-file-pdf"></i></a>` : ''}
-          ${row.docId ? `<button type="button" data-edit-doc="${escapeHtml(row.docId)}"
-              class="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 px-2.5 py-1.5 text-xs font-medium
-                     text-ink-700 hover:bg-ink-50 hover:border-ink-300 transition-colors">
-              <i class="fa-solid fa-pen-to-square text-[11px]"></i> แก้ไข</button>` : ''}
-        </div>
+      <p class="font-mono text-sm text-ink-900 truncate">
+        <span class="${labelClass} text-xs">เลขที่รับ </span>${toThaiDigits(row.receiveNumber) || '-'}
+      </p>
+
+      <p class="font-mono text-xs text-ink-500 truncate">
+        <span class="${labelClass}">รับเมื่อ </span>${formatThaiDate(row.receiveDate) || '-'}
+      </p>
+
+      <p class="text-sm font-medium text-ink-900 truncate min-w-0">${escapeHtml(row.subject) || '(ไม่ระบุเรื่อง)'}</p>
+
+      <p class="text-xs text-ink-500 truncate min-w-0">
+        <span class="${labelClass}">จาก </span>${escapeHtml(row.from) || '-'} · ${escapeHtml(row.department) || '-'}
+      </p>
+
+      <div class="flex items-center gap-1 justify-self-start ${wide ? 'lg:justify-self-end' : ''}">
+        ${row.fileUrl ? `<a href="${escapeHtml(row.fileUrl)}" target="_blank" rel="noopener noreferrer"
+            class="w-8 h-8 rounded-lg inline-flex items-center justify-center text-ink-500 hover:bg-ink-100 hover:text-ink-900"
+            title="เปิดไฟล์ PDF"><i class="fa-solid fa-file-pdf"></i></a>` : ''}
+        ${row.docId ? `<button type="button" data-edit-doc="${escapeHtml(row.docId)}"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 px-2.5 py-1.5 text-xs font-medium
+                   text-ink-700 hover:bg-white hover:border-ink-300 transition-colors">
+            <i class="fa-solid fa-pen-to-square text-[11px]"></i> แก้ไข</button>` : ''}
       </div>`;
+
     target.appendChild(item);
   });
 }
@@ -2298,9 +2320,11 @@ function bindRegistryEditClicks(target) {
 /** โหลดทะเบียนล่าสุดมาแสดงที่หน้าแรก */
 async function loadHomeRegistry() {
   const list = $('homeRegistryList');
+  const head = $('homeRegistryHead');
   const refresh = $('homeRegistryRefresh');
 
   list.innerHTML = '<p class="text-sm text-ink-500">กำลังโหลด...</p>';
+  head.style.display = 'none';
   refresh.disabled = true;
 
   try {
@@ -2310,7 +2334,8 @@ async function loadHomeRegistry() {
       list.innerHTML = '<p class="text-sm text-ink-500">ยังไม่มีรายการในทะเบียน</p>';
       return;
     }
-    renderRegistryRows(out.rows, list);
+    renderRegistryRows(out.rows, list, { wide: true });
+    head.style.display = '';
   } catch (err) {
     console.error(err);
     list.innerHTML = `<p class="text-sm text-seal-500">${escapeHtml(cloudErrorMessage(err))}</p>`;
