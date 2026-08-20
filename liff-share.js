@@ -4,8 +4,11 @@
    ไฟล์นี้ทำสามอย่าง
    ๑) กั้นหน้าเว็บไว้จนกว่า liff.init() และการล็อกอินจะเรียบร้อย
    ๒) ดึงโปรไฟล์ LINE มาแสดงบนหัวเว็บ
-   ๓) อัปโหลด PDF ที่ประทับตราแล้วขึ้น Drive แล้วส่งเป็น Flex Message
-      พร้อมปุ่มเปิดไฟล์ ปุ่มสิ่งที่ส่งมาด้วย และปุ่มส่งต่อไปหน้า share.html
+   ๓) ส่งเอกสารเข้า LINE ด้วย share target picker ได้สองแบบ
+      · การ์ดข้อมูล — อัปโหลด PDF ขึ้น Drive แล้วส่งเป็น Flex Message
+        พร้อมปุ่มเปิดไฟล์ ปุ่มสิ่งที่ส่งมาด้วย และปุ่มส่งต่อไปหน้า share.html
+      · รูปหน้าเอกสาร — แปลงหน้าที่เลือกเป็นรูป อัปโหลดขึ้น Drive
+        แล้วส่งเป็นข้อความรูปภาพ นำหน้าด้วยข้อความที่ผู้ส่งพิมพ์เอง
 
    หน้าตาการ์ดและการเข้ารหัสข้อมูลอยู่ใน flex-doc.js ใช้ร่วมกับ share.html
    ═══════════════════════════════════════════════════════════════════ */
@@ -26,6 +29,18 @@ const FORWARD_BASE = SHARE_PAGE_LIFF_ID
 /** โทนสีการ์ดที่ผู้ส่งเลือกไว้ครั้งก่อน จำไว้ในเครื่อง ไม่ต้องเลือกใหม่ทุกครั้ง */
 const THEME_KEY = 'saraban.shareTheme.v1';
 
+/** รูปแบบที่เลือกส่งครั้งก่อน 'card' หรือ 'image' */
+const MODE_KEY = 'saraban.shareMode.v1';
+
+/** LINE ส่งได้ครั้งละไม่เกินห้าข้อความ ข้อความนำหนึ่งกล่องก็นับรวมด้วย */
+const MESSAGE_MAX = 5;
+
+/** ด้านยาวของรูปที่อัปโหลด พอให้อ่านตัวหนังสือออกโดยไฟล์ไม่อ้วนเกินไป */
+const IMAGE_LONG_EDGE = 1600;
+
+/** ความยาวข้อความนำที่ยอมให้พิมพ์ ต้องตรงกับ maxlength ของ textarea */
+const MESSAGE_LIMIT = 1000;
+
 const el = (id) => document.getElementById(id);
 
 let lineProfile = null;
@@ -34,6 +49,13 @@ let lastUpload = null;    // { fileId, fileUrl, viewUrl, filename, fingerprint, 
 let preparing = null;     // งานสร้าง+อัปโหลดไฟล์ที่กำลังทำอยู่ กันกดซ้ำ
 let shareTheme = loadShareTheme();   // โทนสีของการ์ดที่จะส่งออกไป
 let previewUpload = null;            // ไฟล์ที่ตัวอย่างการ์ดบนจอกำลังอ้างถึง
+
+let shareMode = loadShareMode();     // 'card' = การ์ดข้อมูล  'image' = รูปหน้าเอกสาร
+let selectedPages = [];              // ลำดับหน้าที่ติ๊กไว้ นับจาก 0 เรียงจากน้อยไปมาก
+let messageTouched = false;          // ผู้ส่งแก้ข้อความนำเองแล้วหรือยัง ถ้าแก้แล้วจะไม่เขียนทับ
+let lastImages = null;               // { fingerprint, images: [{ originalUrl, previewUrl, ... }] }
+let preparingImages = null;          // งานอัปโหลดรูปที่กำลังทำอยู่ กันกดซ้ำ
+let imagePrepTimer = 0;              // หน่วงไว้ครู่หนึ่งระหว่างผู้ส่งไล่ติ๊กหน้า
 
 /* ═══════════════════════════════════════════════════════════════════
    โทนสีการ์ด
@@ -47,6 +69,23 @@ function loadShareTheme() {
   } catch (err) {
     console.warn('อ่านโทนสีที่เลือกไว้ไม่ได้ ใช้โทนเริ่มต้นแทน', err);
     return FlexDoc.DEFAULT_THEME;
+  }
+}
+
+function loadShareMode() {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'image' ? 'image' : 'card';
+  } catch (err) {
+    console.warn('อ่านรูปแบบการแชร์ที่เลือกไว้ไม่ได้ ใช้การ์ดข้อมูลแทน', err);
+    return 'card';
+  }
+}
+
+function rememberShareMode(mode) {
+  try {
+    localStorage.setItem(MODE_KEY, mode);
+  } catch (err) {
+    console.warn('จำรูปแบบการแชร์ไว้ในเครื่องไม่ได้', err);
   }
 }
 
@@ -422,6 +461,302 @@ function ensureShareFile({ force = false } = {}) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   โหมดรูปหน้าเอกสาร
+
+   ข้อความรูปภาพของ LINE ไม่ได้แนบไฟล์ไปด้วย ส่งไปแค่ลิงก์ แล้วเซิร์ฟเวอร์
+   ของ LINE จะมาดึงรูปเอง จึงต้องอัปโหลดรูปขึ้น Drive ให้เสร็จเสียก่อน
+   แล้วค่อยเปิดหน้าต่างเลือกผู้รับ
+   ═══════════════════════════════════════════════════════════════════ */
+
+function pageTotal() {
+  return (typeof fabricCanvases !== 'undefined' && fabricCanvases) ? fabricCanvases.length : 0;
+}
+
+/** เลขไทยสำหรับข้อความบนหน้าจอ */
+function thai(value) {
+  return FlexDoc.thaiDigits(String(value));
+}
+
+function shareMessageText() {
+  const box = el('share-message');
+  return box ? box.value.trim() : '';
+}
+
+/** เหลือที่ให้รูปกี่หน้า ข้อความนำหนึ่งกล่องก็กินโควตาไปหนึ่งเหมือนกัน */
+function maxSharePages() {
+  return MESSAGE_MAX - (shareMessageText() ? 1 : 0);
+}
+
+/* ── ข้อความนำ ─────────────────────────────────────────────────── */
+
+/** ร่างข้อความจากช่องในฟอร์ม ผู้ส่งแก้ต่อได้ตามใจ */
+function defaultShareMessage(data) {
+  const lines = [];
+  const school = currentSchool();
+
+  if (school) lines.push(school);
+  if (data.receiveNumber) lines.push(`หนังสือรับเลขที่ ${thai(data.receiveNumber)}`);
+  if (data.subject) lines.push(`เรื่อง ${data.subject}`);
+  if (data.commanded) lines.push(`การสั่งการ ${data.commanded}`);
+  if (data.msgCommand) lines.push(data.msgCommand);
+
+  return lines.join('\n').slice(0, MESSAGE_LIMIT);
+}
+
+/**
+ * เติมข้อความร่างให้ ยกเว้นผู้ส่งพิมพ์แก้เองไว้แล้ว
+ * รวมถึงกรณีลบทิ้งจนว่างเพราะตั้งใจส่งแต่รูป ก็ไม่เขียนทับให้เหมือนกัน
+ */
+function fillShareMessage(force) {
+  const box = el('share-message');
+  if (!box) return;
+  if (!force && messageTouched) return;
+
+  box.value = defaultShareMessage(collectFormData());
+  messageTouched = false;      // ตรงกับร่างจากฟอร์มแล้ว เปิดครั้งหน้าจึงร่างใหม่ได้
+  syncMessageCount();
+}
+
+function syncMessageCount() {
+  const box = el('share-message');
+  const count = el('share-message-count');
+  if (box && count) count.textContent = thai(box.value.length);
+}
+
+/* ── ปุ่มเลือกหน้า ─────────────────────────────────────────────── */
+
+/** ค่าเริ่มต้น เลือกทุกหน้าเท่าที่ LINE ยอมให้ส่งในครั้งเดียว */
+function resetPageSelection() {
+  const limit = Math.max(Math.min(pageTotal(), maxSharePages()), 0);
+  selectedPages = Array.from({ length: limit }, (_, i) => i);
+}
+
+function syncPageButtons() {
+  const picker = el('share-page-picker');
+  if (!picker) return;
+
+  picker.querySelectorAll('button[data-page]').forEach((button) => {
+    const active = selectedPages.includes(Number(button.dataset.page));
+    button.setAttribute('aria-pressed', String(active));
+    button.className = `rounded-lg border py-2 text-xs font-medium transition-colors ${
+      active ? 'border-ink-600 bg-ink-50 text-ink-800' : 'border-desk-300 text-ink-500 hover:border-ink-300'}`;
+  });
+
+  const hint = el('share-page-hint');
+  if (hint) {
+    hint.textContent = `เลือกแล้ว ${thai(selectedPages.length)} จากที่ส่งได้ ${thai(maxSharePages())} หน้า`;
+  }
+}
+
+/** สร้างปุ่มใหม่ทุกครั้งที่เปิดกล่อง เพราะจำนวนหน้าเปลี่ยนได้ */
+function renderPagePicker() {
+  const picker = el('share-page-picker');
+  if (!picker) return;
+
+  picker.innerHTML = Array.from({ length: pageTotal() }, (_, i) => `
+    <button type="button" data-page="${i}" aria-pressed="false">${thai(i + 1)}</button>`).join('');
+
+  syncPageButtons();
+}
+
+/**
+ * ตัดหน้าที่เกินโควตาออกจากท้ายรายการ
+ * เกิดตอนผู้ส่งเริ่มพิมพ์ข้อความนำทั้งที่ติ๊กหน้าไว้เต็มโควตาแล้ว
+ */
+function enforcePageLimit() {
+  const limit = maxSharePages();
+  if (selectedPages.length <= limit) return false;
+
+  const dropped = selectedPages.slice(limit);
+  selectedPages = selectedPages.slice(0, limit);
+
+  syncPageButtons();
+  renderImagePreview();
+  toast(`มีข้อความนำแล้ว จึงเอาหน้า ${thai(dropped.map((i) => i + 1).join(' '))} ออก`, 'info');
+  return true;
+}
+
+/* ── รูปของแต่ละหน้า ───────────────────────────────────────────── */
+
+/** วาดหน้าเอกสารออกมาเป็นรูป ย่อให้ด้านยาวไม่เกินที่กำหนด */
+function pageImageDataUrl(index, longEdge, quality) {
+  const canvas = (typeof fabricCanvases !== 'undefined' && fabricCanvases[index]) || null;
+  if (!canvas) return '';
+
+  canvas.discardActiveObject();
+  canvas.renderAll();
+
+  const edge = Math.max(canvas.getWidth(), canvas.getHeight()) || 1;
+  return canvas.toDataURL({
+    format: 'jpeg',
+    quality,
+    multiplier: Math.min(1, longEdge / edge)
+  });
+}
+
+function renderImagePreview() {
+  const box = el('share-image-preview');
+  if (!box) return;
+
+  if (!selectedPages.length) {
+    box.innerHTML = '<p class="py-6 text-xs text-ink-400">ยังไม่ได้เลือกหน้าที่จะส่ง</p>';
+    return;
+  }
+
+  box.innerHTML = selectedPages.map((index) => `
+    <figure class="w-24">
+      <img src="${pageImageDataUrl(index, 320, 0.7)}" alt="หน้า ${thai(index + 1)}"
+           class="w-full rounded-lg border border-desk-300 bg-white" />
+      <figcaption class="mt-1 text-center text-[11px] text-ink-400">หน้า ${thai(index + 1)}</figcaption>
+    </figure>`).join('');
+}
+
+function shareImageName(data, index) {
+  const base = data.receiveNumber ? `รับ ${data.receiveNumber}` : 'เอกสาร';
+  return `${base} หน้า ${index + 1} ${timestamp()}.jpg`.replace(/[\\/:*?"<>|]/g, '-');
+}
+
+/** ลายนิ้วมือของชุดรูป เปลี่ยนหน้าที่เลือกหรือแก้เอกสารก็ต้องอัปใหม่ */
+function imageFingerprint(data) {
+  return `${docFingerprint(data)}|${selectedPages.join(',')}`;
+}
+
+async function uploadShareImages(data) {
+  const images = selectedPages.map((index) => ({
+    base64: pageImageDataUrl(index, IMAGE_LONG_EDGE, 0.9).split(',')[1],
+    filename: shareImageName(data, index),
+    mime: 'image/jpeg'
+  }));
+
+  const out = await cloudPost('saveShareImages', { images });
+
+  return {
+    fingerprint: imageFingerprint(data),
+    images: out.images || []
+  };
+}
+
+/** อัปโหลดรูปถ้าจำเป็น คืนค่า null เมื่อทำไม่สำเร็จ */
+function ensureShareImages({ force = false } = {}) {
+  if (preparingImages) return preparingImages;
+
+  const shareBtn = el('doShareBtn');
+
+  if (!selectedPages.length) {
+    setShareStatus('error', 'ยังไม่ได้เลือกหน้าที่จะส่ง');
+    showReuploadRow(false);
+    shareBtn.disabled = true;
+    return Promise.resolve(null);
+  }
+
+  const data = collectFormData();
+  const fingerprint = imageFingerprint(data);
+
+  if (!force && lastImages && lastImages.fingerprint === fingerprint) {
+    setShareStatus('ok', `พร้อมส่ง · รูป ${thai(lastImages.images.length)} หน้า`);
+    setShareWarning('');
+    showReuploadRow(true);
+    shareBtn.disabled = false;
+    return Promise.resolve(lastImages);
+  }
+
+  shareBtn.disabled = true;
+  setShareStatus('busy', `กำลังแปลง ${thai(selectedPages.length)} หน้าเป็นรูปและอัปโหลดขึ้น Drive...`);
+
+  preparingImages = uploadShareImages(data)
+    .then((prepared) => {
+      lastImages = prepared;
+      setShareStatus('ok', `พร้อมส่ง · รูป ${thai(prepared.images.length)} หน้า`);
+      setShareWarning('');
+      showReuploadRow(true);
+      return prepared;
+    })
+    .catch((err) => {
+      console.error('อัปโหลดรูปเพื่อแชร์ไม่สำเร็จ', err);
+      setShareStatus('error', cloudErrorMessage(err));
+      setShareWarning('อัปโหลดรูปไม่สำเร็จ จึงยังไม่มีลิงก์ให้ LINE ไปดึงรูปมาแสดง');
+      return null;
+    })
+    .then((prepared) => {
+      preparingImages = null;
+      el('doShareBtn').disabled = !liffReady;
+      return prepared;
+    });
+
+  return preparingImages;
+}
+
+/** ผู้ส่งไล่ติ๊กหน้าทีละใบ รอให้นิ่งสักครู่ค่อยอัปโหลด จะได้ไม่อัปทิ้งอัปขว้าง */
+function scheduleImagePrep() {
+  clearTimeout(imagePrepTimer);
+  if (shareMode !== 'image') return;
+  if (shareBlockReason()) return;        // แชร์ไม่ได้อยู่แล้ว ไม่ต้องอัปรูปทิ้งเปล่า
+
+  el('doShareBtn').disabled = true;
+  setShareStatus('busy', 'กำลังเตรียมรูป...');
+  imagePrepTimer = setTimeout(() => ensureShareImages(), 600);
+}
+
+/* ── สลับโหมด ──────────────────────────────────────────────────── */
+
+function syncModeButtons() {
+  const picker = el('share-mode-picker');
+  if (!picker) return;
+
+  picker.querySelectorAll('button[data-mode]').forEach((button) => {
+    const active = button.dataset.mode === shareMode;
+    button.setAttribute('aria-checked', String(active));
+    button.className = `inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+      active ? 'bg-white text-ink-800 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`;
+  });
+}
+
+/** ซ่อนหรือแสดงส่วนที่เป็นของแต่ละโหมด ยังไม่แตะการเตรียมไฟล์ */
+function applyShareMode() {
+  const image = shareMode === 'image';
+
+  syncModeButtons();
+
+  el('share-card-pane').classList.toggle('hidden', image);
+  el('share-image-pane').classList.toggle('hidden', !image);
+  el('share-card-note').classList.toggle('hidden', image);
+  el('share-image-note').classList.toggle('hidden', !image);
+
+  const sheetRow = el('share-sheet-row');
+  sheetRow.classList.toggle('hidden', image);
+  sheetRow.classList.toggle('flex', !image);
+
+  el('share-subtitle').textContent = image
+    ? 'ระบบจะแปลงหน้าที่เลือกเป็นรูป อัปโหลดขึ้น Drive แล้วส่งพร้อมข้อความที่พิมพ์ไว้'
+    : 'ระบบจะอัปโหลด PDF ที่ประทับตราแล้วขึ้น Drive แล้วส่งเป็นการ์ดข้อมูลลงรับ';
+
+  el('share-submit-label').textContent = image ? 'ส่งรูปเข้า LINE' : 'เลือกผู้รับใน LINE';
+
+  // วาดรูปตัวอย่างเฉพาะตอนที่พาเนลรูปโผล่ขึ้นมา วาดทุกครั้งที่เปิดกล่องจะหน่วงเปล่า ๆ
+  if (image) renderImagePreview();
+
+  showReuploadRow(Boolean(image ? lastImages : lastUpload));
+}
+
+/** เตรียมของให้พร้อมส่งตามโหมดที่เปิดอยู่ */
+function prepareCurrentMode() {
+  const blocked = shareBlockReason();
+
+  if (blocked) {
+    setShareWarning(blocked);
+    setShareStatus('error', 'ยังแชร์เข้า LINE ไม่ได้');
+    el('doShareBtn').disabled = true;
+    return;
+  }
+
+  setShareWarning('');
+  el('doShareBtn').disabled = false;
+
+  if (shareMode === 'image') ensureShareImages();
+  else ensureShareFile();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    กล่องแชร์
    ═══════════════════════════════════════════════════════════════════ */
 function shareBlockReason() {
@@ -449,23 +784,18 @@ function openShareModal() {
 
   el('share-reupload').checked = false;
   el('share-save-sheet').checked = false;
-  showReuploadRow(Boolean(lastUpload));
+
   renderThemePicker();
-
   renderSharePreview(collectFormData(), null);
+
+  // จำนวนหน้าเปลี่ยนได้ระหว่างทาง จึงตั้งหน้าที่เลือกใหม่ทุกครั้งที่เปิด
+  fillShareMessage(false);
+  resetPageSelection();
+  renderPagePicker();
+
+  applyShareMode();
   openSheet(el('shareModal'));
-
-  const blocked = shareBlockReason();
-  if (blocked) {
-    setShareWarning(blocked);
-    setShareStatus('error', 'ยังแชร์เข้า LINE ไม่ได้');
-    el('doShareBtn').disabled = true;
-    return;
-  }
-
-  setShareWarning('');
-  el('doShareBtn').disabled = false;
-  ensureShareFile();
+  prepareCurrentMode();
 }
 
 function closeShareModal() {
@@ -492,7 +822,59 @@ async function saveShareToSheet(data, upload) {
   }
 }
 
-async function doShare() {
+function doShare() {
+  return shareMode === 'image' ? doShareImages() : doShareCard();
+}
+
+/**
+ * ส่งรูปหน้าเอกสาร นำหน้าด้วยข้อความที่ผู้ส่งพิมพ์ไว้ถ้ามี
+ * รูปต้องอัปโหลดขึ้น Drive ให้เสร็จก่อน เพราะ LINE จะไปดึงรูปจากลิงก์เอง
+ */
+async function doShareImages() {
+  const blocked = shareBlockReason();
+  if (blocked) {
+    setShareWarning(blocked);
+    return;
+  }
+
+  if (!selectedPages.length) {
+    toast('เลือกหน้าที่จะส่งก่อน', 'error');
+    return;
+  }
+
+  clearTimeout(imagePrepTimer);          // กดส่งระหว่างรอหน่วง ให้อัปเดี๋ยวนี้เลย
+  const prepared = await ensureShareImages();
+  if (!prepared || !prepared.images.length) return;
+
+  const text = shareMessageText();
+  const messages = text ? [{ type: 'text', text: text.slice(0, MESSAGE_LIMIT) }] : [];
+
+  prepared.images.forEach((image) => messages.push({
+    type: 'image',
+    originalContentUrl: image.originalUrl,
+    previewImageUrl: image.previewUrl
+  }));
+
+  // กันไว้อีกชั้น เผื่อจำนวนหน้าที่เลือกกับข้อความนำรวมกันเกินโควตา
+  messages.length = Math.min(messages.length, MESSAGE_MAX);
+
+  try {
+    const result = await liff.shareTargetPicker(messages, { isMultiple: true });
+
+    if (!result) {
+      toast('ยกเลิกการแชร์', 'info');
+      return;
+    }
+
+    toast(`ส่งรูป ${thai(prepared.images.length)} หน้าเข้า LINE แล้ว`);
+    closeShareModal();
+  } catch (err) {
+    console.error('shareTargetPicker ไม่สำเร็จ', err);
+    toast(`แชร์ไม่สำเร็จ: ${(err && err.message) || err}`, 'error');
+  }
+}
+
+async function doShareCard() {
   const blocked = shareBlockReason();
   if (blocked) {
     setShareWarning(blocked);
@@ -577,7 +959,57 @@ el('cancelShareBtn').addEventListener('click', closeShareModal);
 el('doShareBtn').addEventListener('click', doShare);
 
 el('share-reupload').addEventListener('change', (e) => {
-  if (e.target.checked) ensureShareFile({ force: true });
+  if (!e.target.checked) return;
+  if (shareMode === 'image') ensureShareImages({ force: true });
+  else ensureShareFile({ force: true });
+});
+
+el('share-mode-picker').addEventListener('click', (e) => {
+  const button = e.target.closest('button[data-mode]');
+  if (!button || button.dataset.mode === shareMode) return;
+
+  shareMode = button.dataset.mode === 'image' ? 'image' : 'card';
+  rememberShareMode(shareMode);
+
+  clearTimeout(imagePrepTimer);
+  applyShareMode();
+  prepareCurrentMode();
+});
+
+el('share-page-picker').addEventListener('click', (e) => {
+  const button = e.target.closest('button[data-page]');
+  if (!button) return;
+
+  const page = Number(button.dataset.page);
+  const at = selectedPages.indexOf(page);
+
+  if (at >= 0) {
+    selectedPages.splice(at, 1);
+  } else {
+    if (selectedPages.length >= maxSharePages()) {
+      toast(`ส่งได้ครั้งละไม่เกิน ${thai(maxSharePages())} หน้า`, 'error');
+      return;
+    }
+    selectedPages.push(page);
+    selectedPages.sort((a, b) => a - b);
+  }
+
+  syncPageButtons();
+  renderImagePreview();
+  scheduleImagePrep();
+});
+
+el('share-message').addEventListener('input', () => {
+  messageTouched = true;
+  syncMessageCount();
+  syncPageButtons();
+  if (enforcePageLimit()) scheduleImagePrep();   // ตัดหน้าออกแล้วต้องอัปรูปชุดใหม่
+});
+
+el('share-message-fill').addEventListener('click', () => {
+  fillShareMessage(true);
+  syncPageButtons();
+  if (enforcePageLimit()) scheduleImagePrep();
 });
 
 el('shareModal').addEventListener('click', (e) => {

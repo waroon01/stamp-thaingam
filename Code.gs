@@ -25,7 +25,14 @@ const CONFIG = {
   API_KEY: 'CHANGE-ME-PLEASE',
 
   // true = ให้ทุกคนที่มีลิงก์เปิดไฟล์ได้ (สะดวกเวลาส่งต่อ แต่ระวังเอกสารลับ)
-  SHARE_WITH_ANYONE: false
+  SHARE_WITH_ANYONE: false,
+
+  // โฟลเดอร์ย่อยเก็บรูปหน้าเอกสารที่ส่งเข้า LINE แยกไว้ไม่ให้ปนกับ PDF
+  IMAGE_FOLDER_NAME: 'ภาพแชร์เข้า LINE',
+
+  // เก็บรูปที่ส่งไปแล้วไว้กี่วัน ใช้กับ cleanOldShareImages() ที่ตั้งทริกเกอร์รายวันได้
+  // ตั้ง 0 = ไม่ลบเลย
+  IMAGE_KEEP_DAYS: 30
 };
 
 const HEADERS = [
@@ -96,6 +103,9 @@ function doPost(e) {
 
       case 'saveSettings':
         return jsonOut(saveSettings(body.settings));
+
+      case 'saveShareImages':
+        return jsonOut(saveShareImages(body));
 
       default:
         return jsonOut({ ok: false, error: 'ไม่รู้จักคำสั่ง: ' + body.action });
@@ -178,6 +188,90 @@ function formatAttachments(data) {
     const label = String(labels[index] || '').trim();
     return label ? (label + ' · ' + url) : url;
   }).join('\n');
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   รูปหน้าเอกสารสำหรับส่งเข้า LINE
+
+   ข้อความรูปภาพของ LINE ไม่ได้แนบไฟล์ไปกับข้อความ แต่ส่งไปแค่ลิงก์
+   แล้วเซิร์ฟเวอร์ของ LINE จะมาดึงรูปเอง ไฟล์จึงต้องเปิดให้ผู้ที่มีลิงก์
+   เห็นได้เสมอ ไม่ว่า SHARE_WITH_ANYONE จะตั้งไว้อย่างไร มิฉะนั้นผู้รับ
+   จะเห็นเป็นช่องว่าง
+
+   ลิงก์ที่คืนกลับไปเป็นปลายทาง /thumbnail ซึ่งคืนไฟล์ภาพจริง
+   ต่างจากลิงก์ /view ที่เป็นหน้าเว็บ ถ้าส่ง /view ไป LINE จะแสดงรูปไม่ขึ้น
+   ══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * อัปโหลดรูปหน้าเอกสาร แล้วคืนลิงก์ที่ LINE ดึงรูปไปแสดงได้
+ * body = { images: [{ base64, filename, mime }] }
+ */
+function saveShareImages(body) {
+  const images = (body && body.images) || [];
+
+  if (!images.length) throw new Error('ไม่มีรูปที่จะอัปโหลด');
+  if (images.length > 5) throw new Error('LINE ส่งได้ครั้งละไม่เกิน 5 ข้อความ จึงอัปโหลดเกิน 5 รูปไม่ได้');
+
+  const folder = getImageFolder();
+
+  const out = images.map(function (image, index) {
+    if (!image || !image.base64) throw new Error('ข้อมูลรูปหน้าที่ ' + (index + 1) + ' ไม่ครบ');
+
+    const mime = image.mime || 'image/jpeg';
+    const name = image.filename || ('หน้า_' + (index + 1) + '_' + nowStamp() + '.jpg');
+    const blob = Utilities.newBlob(Utilities.base64Decode(image.base64), mime, name);
+    const file = folder.createFile(blob);
+
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    const id = file.getId();
+    return {
+      fileId: id,
+      filename: name,
+      originalUrl: 'https://drive.google.com/thumbnail?id=' + id + '&sz=w1600',
+      previewUrl: 'https://drive.google.com/thumbnail?id=' + id + '&sz=w480',
+      viewUrl: 'https://drive.google.com/file/d/' + id + '/view?usp=sharing'
+    };
+  });
+
+  return { ok: true, images: out };
+}
+
+/** โฟลเดอร์ย่อยของรูป สร้างให้อัตโนมัติในครั้งแรกที่มีการส่งรูป */
+function getImageFolder() {
+  const parent = getFolder();
+  const name = CONFIG.IMAGE_FOLDER_NAME || 'ภาพแชร์เข้า LINE';
+
+  const found = parent.getFoldersByName(name);
+  return found.hasNext() ? found.next() : parent.createFolder(name);
+}
+
+/**
+ * ย้ายรูปเก่าที่ส่งไปแล้วลงถังขยะ กดรันเองหรือตั้งทริกเกอร์รายวันก็ได้
+ *
+ * ผู้รับที่ย้อนไปเปิดข้อความเก่าจะไม่เห็นรูปอีก เพราะ LINE ไปดึงจากลิงก์ทุกครั้ง
+ * ถ้าต้องการให้รูปอยู่ถาวร ให้ตั้ง IMAGE_KEEP_DAYS เป็น 0
+ */
+function cleanOldShareImages() {
+  const days = Number(CONFIG.IMAGE_KEEP_DAYS || 0);
+  if (!days) {
+    Logger.log('IMAGE_KEEP_DAYS เป็น 0 จึงไม่ลบรูปใด');
+    return;
+  }
+
+  const deadline = new Date(new Date().getTime() - days * 24 * 60 * 60 * 1000);
+  const files = getImageFolder().getFiles();
+  let removed = 0;
+
+  while (files.hasNext()) {
+    const file = files.next();
+    if (file.getDateCreated() < deadline) {
+      file.setTrashed(true);
+      removed++;
+    }
+  }
+
+  Logger.log('ย้ายรูปที่เก่ากว่า ' + days + ' วันลงถังขยะแล้ว ' + removed + ' ไฟล์');
 }
 
 /** เลขทะเบียนถัดไป โดยดูเลขสูงสุดที่มีอยู่ในชีต */
@@ -439,6 +533,7 @@ function setupSheet() {
 function testConfig() {
   Logger.log('ชีต: ' + getSheet().getName());
   Logger.log('โฟลเดอร์: ' + getFolder().getName());
+  Logger.log('โฟลเดอร์รูปแชร์: ' + getImageFolder().getName());
   Logger.log('เลขทะเบียนถัดไป: ' + nextReceiveNumber());
   Logger.log('ค่าตั้งค่าหน่วยงาน: ' + JSON.stringify(readSettings()));
   Logger.log('ตั้งค่าครบแล้ว');

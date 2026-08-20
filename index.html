@@ -806,25 +806,72 @@
     <div class="flex items-start justify-between mb-1">
       <div>
         <h2 class="font-display font-semibold text-lg">แชร์เอกสารเข้า LINE</h2>
-        <p class="text-xs text-ink-500 mt-0.5">ระบบจะอัปโหลด PDF ที่ประทับตราแล้วขึ้น Drive แล้วส่งเป็นการ์ดข้อมูลลงรับ</p>
+        <p id="share-subtitle" class="text-xs text-ink-500 mt-0.5">ระบบจะอัปโหลด PDF ที่ประทับตราแล้วขึ้น Drive แล้วส่งเป็นการ์ดข้อมูลลงรับ</p>
       </div>
       <button id="closeShareModal" class="w-8 h-8 rounded-lg hover:bg-desk-100 text-ink-500 shrink-0" aria-label="ปิด">
         <i class="fa-solid fa-xmark"></i>
       </button>
     </div>
 
-    <!-- โทนสีการ์ด — ปุ่มสร้างจาก FlexDoc.ORIGIN_THEMES ใน liff-share.js -->
-    <p class="text-[11px] font-medium text-ink-400 mt-4 mb-2">โทนสีการ์ด</p>
-    <div id="share-theme-picker" class="grid grid-cols-3 gap-2" role="radiogroup" aria-label="โทนสีการ์ด"></div>
+    <!-- รูปแบบที่จะส่ง — ปุ่มทั้งสองใช้กล่องเดียวกัน ต่างกันแค่สิ่งที่ผู้รับได้ -->
+    <div id="share-mode-picker" class="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-desk-100 p-1"
+         role="radiogroup" aria-label="รูปแบบที่จะส่ง">
+      <button type="button" role="radio" data-mode="card" aria-checked="true">
+        <i class="fa-regular fa-address-card"></i> การ์ดข้อมูล
+      </button>
+      <button type="button" role="radio" data-mode="image" aria-checked="false">
+        <i class="fa-regular fa-image"></i> รูปหน้าเอกสาร
+      </button>
+    </div>
 
-    <!-- ตัวอย่างการ์ดที่ผู้รับจะเห็น -->
-    <p class="text-[11px] font-medium text-ink-400 mt-4 mb-2">ตัวอย่างการ์ดที่ผู้รับจะเห็น</p>
-    <div class="rounded-2xl bg-desk-200 p-3 max-h-[40dvh] overflow-y-auto">
-      <div id="sharePreview" class="mx-auto w-full max-w-[19rem]"></div>
+    <!-- ══ โหมดการ์ดข้อมูล ══ -->
+    <div id="share-card-pane">
+      <!-- โทนสีการ์ด — ปุ่มสร้างจาก FlexDoc.ORIGIN_THEMES ใน liff-share.js -->
+      <p class="text-[11px] font-medium text-ink-400 mt-4 mb-2">โทนสีการ์ด</p>
+      <div id="share-theme-picker" class="grid grid-cols-3 gap-2" role="radiogroup" aria-label="โทนสีการ์ด"></div>
+
+      <!-- ตัวอย่างการ์ดที่ผู้รับจะเห็น -->
+      <p class="text-[11px] font-medium text-ink-400 mt-4 mb-2">ตัวอย่างการ์ดที่ผู้รับจะเห็น</p>
+      <div class="rounded-2xl bg-desk-200 p-3 max-h-[40dvh] overflow-y-auto">
+        <div id="sharePreview" class="mx-auto w-full max-w-[19rem]"></div>
+      </div>
+    </div>
+
+    <!-- ══ โหมดรูปหน้าเอกสาร ══ -->
+    <div id="share-image-pane" class="hidden">
+      <div class="flex items-end justify-between mt-4 mb-2">
+        <p class="text-[11px] font-medium text-ink-400">หน้าที่จะส่ง</p>
+        <span id="share-page-hint" class="text-[11px] text-ink-400"></span>
+      </div>
+      <!-- ปุ่มแต่ละหน้าสร้างใน liff-share.js ตามจำนวนหน้าที่เปิดอยู่ -->
+      <div id="share-page-picker" class="grid grid-cols-5 gap-2" role="group" aria-label="หน้าที่จะส่ง"></div>
+
+      <p class="text-[11px] font-medium text-ink-400 mt-4 mb-2">ตัวอย่างรูปที่ผู้รับจะเห็น</p>
+      <div class="rounded-2xl bg-desk-200 p-3 max-h-[34dvh] overflow-y-auto">
+        <div id="share-image-preview" class="flex flex-wrap justify-center gap-2"></div>
+      </div>
+
+      <div class="mt-4">
+        <div class="flex items-end justify-between mb-1">
+          <label for="share-message" class="text-[11px] font-medium text-ink-400">ข้อความที่ส่งไปพร้อมรูป</label>
+          <button type="button" id="share-message-fill"
+                  class="text-[11px] text-ink-500 hover:text-ink-700 underline decoration-dotted underline-offset-2">
+            ดึงข้อความจากฟอร์ม
+          </button>
+        </div>
+        <textarea id="share-message" rows="4" maxlength="1000"
+                  placeholder="เว้นว่างไว้ = ส่งเฉพาะรูป ไม่มีข้อความนำ"
+                  class="w-full rounded-lg border border-desk-300 bg-white px-3 py-2 text-sm leading-relaxed
+                         text-ink-900 placeholder:text-ink-300 focus:outline-none focus:border-ink-500
+                         focus:ring-4 focus:ring-ink-500/10"></textarea>
+        <p class="mt-1 text-[11px] text-ink-400">
+          <span id="share-message-count">๐</span>/๑๐๐๐ ตัวอักษร · ข้อความจะไปถึงก่อน แล้วรูปตามไปทีละหน้า
+        </p>
+      </div>
     </div>
 
     <div class="mt-4 space-y-2">
-      <label class="flex items-start gap-2.5 text-sm text-ink-700 cursor-pointer">
+      <label id="share-sheet-row" class="flex items-start gap-2.5 text-sm text-ink-700 cursor-pointer">
         <input type="checkbox" id="share-save-sheet" class="mt-1 accent-ink-600" />
         <span>
           บันทึกลงทะเบียนรับด้วย
@@ -849,9 +896,14 @@
 
     <p id="share-warning" class="hidden mt-3 rounded-lg bg-seal-500/5 border border-seal-500/30 px-3 py-2 text-xs text-seal-500"></p>
 
-    <p class="text-[11px] text-ink-400 leading-relaxed mt-3">
+    <p id="share-card-note" class="text-[11px] text-ink-400 leading-relaxed mt-3">
       ผู้รับจะเปิดไฟล์ได้ก็ต่อเมื่อ <span class="font-mono">SHARE_WITH_ANYONE</span> ใน <span class="font-mono">Code.gs</span>
       ตั้งเป็น <span class="font-mono">true</span> ไว้แล้ว
+    </p>
+
+    <p id="share-image-note" class="hidden text-[11px] text-ink-400 leading-relaxed mt-3">
+      รูปที่ส่งจะถูกเปิดให้ผู้ที่มีลิงก์เห็นได้เสมอ เพราะ LINE ต้องไปดึงรูปจาก Drive มาแสดงเอง
+      เอกสารลับจึงควรส่งเป็นการ์ดข้อมูลแทน · โหมดนี้ยังไม่เขียนแถวลงทะเบียน ให้ใช้ปุ่มบันทึกในหน้าหลัก
     </p>
 
     <div class="flex gap-2 mt-4">
@@ -859,7 +911,7 @@
       <button type="button" id="doShareBtn"
               class="flex-[1.6] inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold text-white
                      transition-opacity hover:opacity-90 disabled:opacity-50" style="background:#06C755">
-        <i class="fa-brands fa-line text-lg"></i> เลือกผู้รับใน LINE
+        <i class="fa-brands fa-line text-lg"></i> <span id="share-submit-label">เลือกผู้รับใน LINE</span>
       </button>
     </div>
   </div>
