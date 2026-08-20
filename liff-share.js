@@ -23,12 +23,80 @@ const FORWARD_BASE = SHARE_PAGE_LIFF_ID
   ? `https://liff.line.me/${SHARE_PAGE_LIFF_ID}`
   : `https://liff.line.me/${LIFF_ID}/share.html`;
 
+/** โทนสีการ์ดที่ผู้ส่งเลือกไว้ครั้งก่อน จำไว้ในเครื่อง ไม่ต้องเลือกใหม่ทุกครั้ง */
+const THEME_KEY = 'saraban.shareTheme.v1';
+
 const el = (id) => document.getElementById(id);
 
 let lineProfile = null;
 let liffReady = false;
 let lastUpload = null;    // { fileId, fileUrl, viewUrl, filename, fingerprint, payload, forwardUrl, trimmed }
 let preparing = null;     // งานสร้าง+อัปโหลดไฟล์ที่กำลังทำอยู่ กันกดซ้ำ
+let shareTheme = loadShareTheme();   // โทนสีของการ์ดที่จะส่งออกไป
+let previewUpload = null;            // ไฟล์ที่ตัวอย่างการ์ดบนจอกำลังอ้างถึง
+
+/* ═══════════════════════════════════════════════════════════════════
+   โทนสีการ์ด
+
+   โทนไม่ได้เดินทางไปกับลิงก์ปุ่มส่งต่อ เป็นแค่สีของการ์ดใบที่ส่งครั้งแรก
+   การ์ดทอดสองยังเป็นโทนเขียวเหมือนเดิม ผู้รับจะได้แยกออกว่าเป็นของส่งต่อ
+   ═══════════════════════════════════════════════════════════════════ */
+function loadShareTheme() {
+  try {
+    return FlexDoc.originTheme(localStorage.getItem(THEME_KEY));
+  } catch (err) {
+    console.warn('อ่านโทนสีที่เลือกไว้ไม่ได้ ใช้โทนเริ่มต้นแทน', err);
+    return FlexDoc.DEFAULT_THEME;
+  }
+}
+
+function rememberShareTheme(key) {
+  try {
+    localStorage.setItem(THEME_KEY, key);
+  } catch (err) {
+    console.warn('จำโทนสีที่เลือกไว้ในเครื่องไม่ได้', err);
+  }
+}
+
+/** ปรับหน้าตาปุ่มให้ปุ่มของโทนที่เลือกอยู่เด่นขึ้นมาใบเดียว */
+function syncThemeButtons() {
+  const picker = el('share-theme-picker');
+  if (!picker) return;
+
+  picker.querySelectorAll('button[data-theme]').forEach((button) => {
+    const active = button.dataset.theme === shareTheme;
+    button.setAttribute('aria-checked', String(active));
+    button.className = `flex items-center gap-2 rounded-xl border px-2.5 py-2 text-xs font-medium transition-colors ${
+      active ? 'border-ink-600 bg-ink-50 text-ink-800' : 'border-desk-300 text-ink-500 hover:border-ink-300'}`;
+  });
+}
+
+function renderThemePicker() {
+  const picker = el('share-theme-picker');
+  if (!picker || picker.dataset.ready === '1') {
+    syncThemeButtons();
+    return;
+  }
+
+  picker.innerHTML = FlexDoc.ORIGIN_THEMES.map((theme) => `
+    <button type="button" role="radio" data-theme="${theme.key}" aria-checked="false">
+      <span class="w-4 h-4 rounded-full shrink-0" style="background:${theme.swatch}"></span>
+      <span class="truncate">${FlexDoc.escapeHtml(theme.label)}</span>
+    </button>`).join('');
+
+  picker.addEventListener('click', (e) => {
+    const button = e.target.closest('button[data-theme]');
+    if (!button) return;
+
+    shareTheme = FlexDoc.originTheme(button.dataset.theme);
+    rememberShareTheme(shareTheme);
+    syncThemeButtons();
+    renderSharePreview(collectFormData(), previewUpload);   // วาดใบเดิมด้วยสีใหม่
+  });
+
+  picker.dataset.ready = '1';
+  syncThemeButtons();
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    หน้าจอกั้นก่อนเข้าใช้งาน
@@ -288,12 +356,15 @@ function renderSharePreview(data, upload) {
   const box = el('sharePreview');
   if (!box) return;
 
+  previewUpload = upload || null;
+
   const payload = upload
     ? upload.payload
     : FlexDoc.payloadFromForm(data, { school: currentSchool() });
 
   box.innerHTML = FlexDoc.cardHtml(FlexDoc.modelFrom(payload), {
-    forwardUrl: upload ? upload.forwardUrl : ''
+    forwardUrl: upload ? upload.forwardUrl : '',
+    theme: shareTheme
   });
 }
 
@@ -379,6 +450,7 @@ function openShareModal() {
   el('share-reupload').checked = false;
   el('share-save-sheet').checked = false;
   showReuploadRow(Boolean(lastUpload));
+  renderThemePicker();
 
   renderSharePreview(collectFormData(), null);
   openSheet(el('shareModal'));
@@ -440,7 +512,8 @@ async function doShare() {
   }
 
   const message = FlexDoc.buildFlex(FlexDoc.modelFrom(upload.payload), {
-    forwardUrl: upload.forwardUrl
+    forwardUrl: upload.forwardUrl,
+    theme: shareTheme
   });
 
   try {

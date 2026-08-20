@@ -6,10 +6,14 @@
    ๒) แปลงก้อนนั้นกลับมาเป็นการ์ด ทั้งแบบ Flex Message และแบบ HTML
    ๓) สร้างลิงก์ LIFF สำหรับปุ่ม "ส่งต่อ" โดยคุมความยาวไม่ให้เกินที่ LINE รับ
 
-   การ์ดมีสองโทน
-   • origin  โทนหมึกน้ำเงิน — การ์ดต้นทางจากงานสารบรรณ มีปุ่มส่งต่อ
-   • forward โทนเขียว — การ์ดที่ผู้รับส่งต่ออีกทอด ไม่มีปุ่มส่งต่อแล้ว
-     ส่งต่อได้ทอดเดียวโดยตั้งใจ เอกสารจะได้ไม่กระจายต่อไปไม่รู้จบ
+   การ์ดต้นทางมีให้เลือกสามโทน หมึกน้ำเงิน · ชาดแดง · ครามม่วง
+   ผู้ส่งเลือกเองตอนกดแชร์ครั้งแรก ทุกโทนมีปุ่มส่งต่อเหมือนกัน ต่างกันแค่สี
+
+   ส่วนการ์ดที่ผู้รับส่งต่ออีกทอด (forward) ตรึงไว้ที่โทนเขียวเสมอ
+   และไม่มีปุ่มส่งต่อแล้ว ส่งต่อได้ทอดเดียวโดยตั้งใจ เอกสารจะได้ไม่กระจาย
+   ต่อไปไม่รู้จบ ผลพลอยได้คือผู้รับแยกออกทันทีว่าการ์ดใบนี้เป็นทอดที่สอง
+
+   ช่อง "การปฏิบัติ" ที่มีคำว่าด่วน จะขึ้นเป็นตัวหนาสีแดง ทั้งในการ์ดจริงและตัวอย่าง
 
    ไม่พึ่งพา app.js เพื่อให้หน้า share.html ที่ไม่มีตัวแก้เอกสารเรียกใช้ได้ด้วย
    ═══════════════════════════════════════════════════════════════════ */
@@ -27,9 +31,14 @@ window.FlexDoc = (function () {
   const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
                              'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
-  /* ── โทนสีของการ์ดสองแบบ ───────────────────────────────────────── */
+  /* ── โทนสีของการ์ด ─────────────────────────────────────────────
+     สามโทนแรกเป็นของการ์ดต้นทาง ผู้ส่งเลือกเองก่อนกดแชร์
+     โทน forward สงวนไว้ให้การ์ดทอดสองเท่านั้น จึงไม่อยู่ในตัวเลือก
+     ทุกโทนใช้คีย์เหมือนกันหมด เพิ่มโทนใหม่ก็แค่เติมอีกก้อนกับอีกบรรทัด
+     ใน ORIGIN_THEMES ไม่ต้องแก้ที่อื่น
+     ────────────────────────────────────────────────────────────── */
   const THEMES = {
-    origin: {
+    navy: {
       kicker: 'ลงรับหนังสือราชการ',
       header: '#12203D',
       headerSoft: '#1F3568',
@@ -41,6 +50,32 @@ window.FlexDoc = (function () {
       noteTint: '#EAF0FA',
       primary: '#12203D',
       line: '#E4E8F1'
+    },
+    crimson: {
+      kicker: 'ลงรับหนังสือราชการ',
+      header: '#75211D',
+      headerSoft: '#932A25',
+      accent: '#E4B0AC',
+      label: '#A18683',
+      value: '#3A1614',
+      strong: '#932A25',
+      tint: '#FBF3F2',
+      noteTint: '#F6E7E5',
+      primary: '#932A25',
+      line: '#EFE0DE'
+    },
+    plum: {
+      kicker: 'ลงรับหนังสือราชการ',
+      header: '#2E2150',
+      headerSoft: '#453370',
+      accent: '#BDB0DE',
+      label: '#8F87A6',
+      value: '#241A40',
+      strong: '#453370',
+      tint: '#F5F3FB',
+      noteTint: '#ECE7F8',
+      primary: '#2E2150',
+      line: '#E5E1F0'
     },
     forward: {
       kicker: 'ส่งต่อเอกสารลงรับ',
@@ -57,7 +92,29 @@ window.FlexDoc = (function () {
     }
   };
 
+  /* ชื่อเดิมของโทนต้นทาง เผื่อโค้ดเก่าที่ยังส่ง theme: 'origin' เข้ามา */
+  THEMES.origin = THEMES.navy;
+
+  const DEFAULT_THEME = 'navy';
+
+  /* รายการโทนที่ยื่นให้ผู้ส่งเลือก เรียงตามลำดับที่อยากให้ปุ่มขึ้นบนหน้าจอ */
+  const ORIGIN_THEMES = [
+    { key: 'navy',    label: 'หมึกน้ำเงิน', swatch: '#12203D' },
+    { key: 'crimson', label: 'ชาดแดง',      swatch: '#932A25' },
+    { key: 'plum',    label: 'ครามม่วง',    swatch: '#2E2150' }
+  ];
+
   const LINE_GREEN = '#06C755';
+
+  /* ── หนังสือด่วน ───────────────────────────────────────────────
+     ถ้าช่องการปฏิบัติมีคำว่าด่วน ไม่ว่าจะด่วน ด่วนมาก หรือด่วนที่สุด
+     ให้บรรทัดนั้นขึ้นเป็นตัวหนาสีแดง ผู้รับจะได้สะดุดตาตั้งแต่ยังไม่เปิดไฟล์
+     ────────────────────────────────────────────────────────────── */
+  const URGENT_RED = '#B23A34';
+
+  function isUrgent(text) {
+    return /ด่วน/.test(String(text == null ? '' : text));
+  }
 
   /**
    * โลโก้เล็ก ๆ หน้าชื่อโรงเรียนบนหัวการ์ด
@@ -71,7 +128,12 @@ window.FlexDoc = (function () {
   const SCHOOL_LOGO = 'https://res.cloudinary.com/djkbdwnsc/image/upload/c_fit,h_96,w_96,q_auto/v1786978522/next-fullStack/Logo-thaingam_1_k2iec7.png';
 
   function themeOf(name) {
-    return THEMES[name] || THEMES.origin;
+    return THEMES[name] || THEMES[DEFAULT_THEME];
+  }
+
+  /** กันค่าโทนแปลกปลอมที่มาจากค่าที่จำไว้ในเครื่องหรือจากลิงก์ */
+  function originTheme(name) {
+    return ORIGIN_THEMES.some((item) => item.key === name) ? name : DEFAULT_THEME;
   }
 
   /* ── ตัวช่วยทั่วไป ─────────────────────────────────────────────── */
@@ -269,9 +331,9 @@ window.FlexDoc = (function () {
     const p = payload || {};
 
     const rows = [];
-    const add = (label, value) => {
+    const add = (label, value, urgent) => {
       const text = String(value == null ? '' : value).trim();
-      if (text) rows.push({ label, value: text });
+      if (text) rows.push({ label, value: text, urgent: Boolean(urgent) });
     };
 
     add('เลขทะเบียนรับ', thaiDigits(p.n));
@@ -281,7 +343,7 @@ window.FlexDoc = (function () {
     add('จาก', p.f);
     add('ถึง', p.t);
     add('ฝ่ายที่รับผิดชอบ', p.dp);
-    add('การปฏิบัติ', p.a);
+    add('การปฏิบัติ', p.a, isUrgent(p.a));
 
     const attachments = (p.at || [])
       .map((pair, index) => ({
@@ -292,6 +354,7 @@ window.FlexDoc = (function () {
 
     return {
       school: String(p.sc || 'งานสารบรรณ').trim(),
+      urgent: isUrgent(p.a),
       receiveNumber: thaiDigits(p.n || ''),
       subject: String(p.s || '').trim() || '(ไม่ได้ระบุเรื่อง)',
       rows,
@@ -306,13 +369,24 @@ window.FlexDoc = (function () {
 
   /* ── Flex Message ──────────────────────────────────────────────── */
   function flexRow(row, t) {
+    const value = {
+      type: 'text', text: row.value, size: 'sm',
+      color: row.urgent ? URGENT_RED : t.value,
+      flex: 7, wrap: true
+    };
+    if (row.urgent) value.weight = 'bold';
+
     return {
       type: 'box',
       layout: 'horizontal',
       spacing: 'sm',
       contents: [
-        { type: 'text', text: row.label, size: 'sm', color: t.label, flex: 4, wrap: true },
-        { type: 'text', text: row.value, size: 'sm', color: t.value, flex: 7, wrap: true }
+        {
+          type: 'text', text: row.label, size: 'sm',
+          color: row.urgent ? URGENT_RED : t.label,
+          flex: 4, wrap: true
+        },
+        value
       ]
     };
   }
@@ -488,8 +562,9 @@ window.FlexDoc = (function () {
 
     const rows = model.rows.map((row) => `
       <div class="flex gap-2 text-[13px] leading-snug">
-        <span class="w-[38%] shrink-0" style="color:${t.label}">${escapeHtml(row.label)}</span>
-        <span class="flex-1 break-words" style="color:${t.value}">${escapeHtml(row.value)}</span>
+        <span class="w-[38%] shrink-0" style="color:${row.urgent ? URGENT_RED : t.label}">${escapeHtml(row.label)}</span>
+        <span class="flex-1 break-words" style="color:${row.urgent ? URGENT_RED : t.value}${
+          row.urgent ? ';font-weight:600' : ''}">${escapeHtml(row.value)}</span>
       </div>`).join('');
 
     const tint = (model.command || model.note) ? `
@@ -575,6 +650,10 @@ window.FlexDoc = (function () {
   return {
     URI_LIMIT,
     NOTE_LIMIT,
+    ORIGIN_THEMES,
+    DEFAULT_THEME,
+    originTheme,
+    isUrgent,
     thaiDigits,
     thaiDate,
     cut,
