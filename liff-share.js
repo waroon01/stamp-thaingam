@@ -811,9 +811,15 @@ async function saveShareToSheet(data, upload) {
       saveToSheet: true,
       fileUrl: upload.fileUrl,
       fileId: upload.fileId,
-      filename: upload.filename
+      filename: upload.filename,
+      // อยู่ในโหมดแก้ไขอยู่ ให้ทับแถวเดิมเหมือนปุ่มบันทึกลงทะเบียน
+      // ไม่งั้นแชร์เข้า LINE ทีหนึ่งจะได้แถวใหม่เพิ่มมาอีกหนึ่งแถว
+      docId: editingDoc ? editingDoc.docId : ''
     });
-    toast(out.row ? `บันทึกลงทะเบียนที่แถว ${out.row} แล้ว` : 'บันทึกลงทะเบียนแล้ว');
+
+    if (out.updated) exitEditMode();
+    toast(out.updated ? 'แก้ไขรายการเดิมแล้ว'
+      : (out.row ? `บันทึกลงทะเบียนที่แถว ${out.row} แล้ว` : 'บันทึกลงทะเบียนแล้ว'));
   } catch (err) {
     console.error(err);
     toast(cloudErrorMessage(err), 'error');

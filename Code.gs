@@ -38,8 +38,24 @@ const CONFIG = {
 const HEADERS = [
   'บันทึกเมื่อ', 'เลขที่รับ', 'วันที่รับ', 'เลขที่หนังสือ', 'หนังสือลงวันที่',
   'จาก', 'ถึง', 'เรื่อง', 'การปฏิบัติ', 'ฝ่าย', 'การสั่งการ',
-  'ข้อความเพิ่มเติม', 'ลิงก์ไฟล์', 'สิ่งที่ส่งมาด้วย', 'ชื่อไฟล์'
+  'ข้อความเพิ่มเติม', 'ลิงก์ไฟล์', 'สิ่งที่ส่งมาด้วย', 'ชื่อไฟล์',
+  'รหัสเอกสาร', 'ข้อมูลดิบ'
 ];
+
+/**
+ * สองคอลัมน์ท้ายเพิ่มมาเพื่อรองรับปุ่ม "แก้ไข" ที่หน้าแรก
+ *
+ * รหัสเอกสาร (docId) เป็นรหัสสุ่มประจำแถว ใช้อ้างอิงแทนเลขแถว เพราะเลขแถว
+ *   จะเลื่อนทันทีที่มีคนลบหรือเรียงแถวในชีต แล้วปุ่มแก้ไขจะไปทับผิดฉบับ
+ *
+ * ข้อมูลดิบ เก็บค่าที่กรอกในฟอร์มทั้งชุดเป็น JSON เพราะคอลัมน์ที่คนอ่าน
+ *   ผ่านชีตถูกจัดรูปแบบไปแล้ว (เลขที่รับ 0124 โดน Sheets กินศูนย์นำหน้า
+ *   สิ่งที่ส่งมาด้วยถูกยุบเป็นข้อความก้อนเดียว) ดึงกลับมาเติมฟอร์มจะเพี้ยน
+ *   ตอนแก้ไขจึงอ่านจาก JSON ก้อนนี้เป็นหลัก แล้วค่อยถอยไปอ่านคอลัมน์
+ *   สำหรับแถวเก่าที่บันทึกไว้ก่อนมีคอลัมน์นี้
+ */
+const COL_DOC_ID = 16;
+const COL_PAYLOAD = 17;
 
 const SETTINGS_HEADERS = ['คีย์', 'ค่า', 'คำอธิบาย', 'แก้ไขเมื่อ'];
 
@@ -61,7 +77,7 @@ const SETTINGS_FIELDS = [
    จุดรับคำขอ
    ══════════════════════════════════════════════════════════════════════ */
 
-/** คำขอแบบอ่านข้อมูล: ping / nextNumber / list / check */
+/** คำขอแบบอ่านข้อมูล: ping / nextNumber / list / check / settings / document */
 function doGet(e) {
   try {
     const params = (e && e.parameter) || {};
@@ -78,7 +94,11 @@ function doGet(e) {
         return jsonOut({ ok: true, rows: listRecent(Number(params.limit) || 20) });
 
       case 'check':
-        return jsonOut(Object.assign({ ok: true }, findByReceiveNumber(params.receiveNumber)));
+        return jsonOut(Object.assign({ ok: true },
+          findByReceiveNumber(params.receiveNumber, params.excludeDocId)));
+
+      case 'document':
+        return jsonOut({ ok: true, doc: getDocumentById(params.docId) });
 
       case 'settings':
         return jsonOut({ ok: true, settings: readSettings() });
@@ -123,15 +143,21 @@ function doPost(e) {
 
 /**
  * บันทึกเอกสาร: อัปโหลด PDF ลง Drive และเขียนแถวลงทะเบียน
- * body = { data, pdfBase64, filename, saveToSheet }
+ * body = { data, pdfBase64, filename, saveToSheet, docId }
+ *
+ * ถ้าส่ง docId มาด้วย = กำลังแก้ไขเอกสารเดิม จะทับแถวเดิมแทนการเพิ่มแถวใหม่
+ * และย้ายไฟล์ PDF ฉบับก่อนหน้าลงถังขยะ ไม่ให้เหลือไฟล์ค้างใน Drive
  */
 function saveDocument(body) {
   const data = body.data || {};
+  const docId = String(body.docId || '').trim();
 
   // แชร์เข้า LINE จะอัปโหลดไฟล์ไปก่อนแล้ว รอบบันทึกลงทะเบียนจึงส่งมาแต่ลิงก์เดิม
   let fileUrl = body.fileUrl || '';
   let fileId = body.fileId || '';
 
+  // อัปโหลดก่อนแล้วค่อยจับล็อก การอัปไฟล์ใหญ่กินเวลาหลายวินาที
+  // ถ้าถือล็อกคร่อมไว้ด้วย เครื่องอื่นที่รออยู่จะรอจนหมดเวลา 20 วินาที
   if (body.pdfBase64) {
     const filename = body.filename || ('รับหนังสือ_' + nowStamp() + '.pdf');
     const blob = Utilities.newBlob(Utilities.base64Decode(body.pdfBase64), 'application/pdf', filename);
@@ -145,49 +171,164 @@ function saveDocument(body) {
     fileId = file.getId();
   }
 
-  let row = 0;
-
-  if (body.saveToSheet !== false) {
-    // ล็อกไว้กันสองเครื่องบันทึกพร้อมกันแล้วเลขทะเบียนชนกัน
-    const lock = LockService.getScriptLock();
-    lock.waitLock(20000);
-    try {
-      const sheet = getSheet();
-      sheet.appendRow([
-        new Date(),
-        String(data.receiveNumber || ''),
-        data.receiveDate || '',
-        String(data.bookNumber || ''),
-        data.bookDate || '',
-        data.fromInp || '',
-        data.to || '',
-        data.subject || '',
-        data.action || '',
-        data.department || '',
-        data.commanded || '',
-        data.msgCommand || '',
-        fileUrl,
-        formatAttachments(data),
-        body.filename || ''
-      ]);
-      row = sheet.getLastRow();
-    } finally {
-      lock.releaseLock();
-    }
+  // อัปขึ้น Drive อย่างเดียว ไม่ต้องแตะชีตเลย
+  if (body.saveToSheet === false) {
+    return { ok: true, fileUrl: fileUrl, fileId: fileId, row: 0, docId: docId };
   }
 
-  return { ok: true, fileUrl: fileUrl, fileId: fileId, row: row };
+  // ล็อกคร่อมทั้งอ่านและเขียน ไม่ใช่แค่ตอนเขียน มิฉะนั้นสองเครื่องที่แก้แถว
+  // เดียวกันพร้อมกันจะอ่านของเก่าได้เหมือนกันแล้วเขียนทับกันเอง
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+
+  try {
+    const sheet = getSheet();
+    ensureColumns(sheet);
+
+    const target = docId ? findRowByDocId(sheet, docId) : null;
+    if (docId && !target) {
+      throw new Error('ไม่พบเอกสารที่จะแก้ไข อาจถูกลบออกจากชีตไปแล้ว');
+    }
+
+    // แก้แต่ข้อมูลในฟอร์ม ไม่ได้สร้าง PDF ใหม่ ให้คงลิงก์ไฟล์เดิมไว้
+    if (target && !fileUrl) {
+      fileUrl = target.fileUrl;
+      fileId = target.fileId;
+    }
+
+    const newDocId = docId || Utilities.getUuid();
+    const values = documentRowValues(data, {
+      docId: newDocId,
+      fileUrl: fileUrl,
+      fileId: fileId,
+      filename: body.filename || (target ? target.filename : ''),
+      savedAt: target ? target.savedAt : new Date()
+    });
+
+    let row;
+    if (target) {
+      row = target.row;
+      sheet.getRange(row, 1, 1, HEADERS.length).setValues([values]);
+    } else {
+      sheet.appendRow(values);
+      row = sheet.getLastRow();
+    }
+
+    // ทิ้งไฟล์เก่าหลังเขียนแถวสำเร็จเท่านั้น ถ้าทิ้งก่อนแล้วเขียนพลาด
+    // จะเหลือแถวที่ชี้ไปไฟล์ที่ไม่มีอยู่จริง
+    if (target && target.fileId && target.fileId !== fileId) {
+      trashFile(target.fileId);
+    }
+
+    return { ok: true, fileUrl: fileUrl, fileId: fileId, row: row, docId: newDocId, updated: !!target };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
-/** สิ่งที่ส่งมาด้วย เขียนเป็น "ชื่อรายการ · ลิงก์" บรรทัดละรายการ */
-function formatAttachments(data) {
+/** ประกอบค่าหนึ่งแถวให้ครบ HEADERS พร้อมก้อน JSON ท้ายแถว */
+function documentRowValues(data, meta) {
+  const payload = {
+    docId: meta.docId,
+    fileUrl: meta.fileUrl || '',
+    fileId: meta.fileId || '',
+    filename: meta.filename || '',
+    updatedAt: new Date().toISOString(),
+    data: {
+      receiveNumber: String(data.receiveNumber || ''),
+      receiveDate: data.receiveDate || '',
+      bookNumber: String(data.bookNumber || ''),
+      bookDate: data.bookDate || '',
+      fromInp: data.fromInp || '',
+      to: data.to || '',
+      subject: data.subject || '',
+      action: data.action || '',
+      department: data.department || '',
+      commanded: data.commanded || '',
+      msgCommand: data.msgCommand || '',
+      attachments: normalizeAttachments(data)
+    }
+  };
+
+  return [
+    meta.savedAt || new Date(),
+    String(data.receiveNumber || ''),
+    data.receiveDate || '',
+    String(data.bookNumber || ''),
+    data.bookDate || '',
+    data.fromInp || '',
+    data.to || '',
+    data.subject || '',
+    data.action || '',
+    data.department || '',
+    data.commanded || '',
+    data.msgCommand || '',
+    meta.fileUrl || '',
+    formatAttachments(data),
+    meta.filename || '',
+    meta.docId,
+    JSON.stringify(payload)
+  ];
+}
+
+/** ย้ายไฟล์เดิมลงถังขยะแบบไม่ให้ล้มทั้งคำขอ ถ้าไฟล์ถูกลบไปแล้วก็ปล่อยผ่าน */
+function trashFile(fileId) {
+  if (!fileId) return;
+  try {
+    DriveApp.getFileById(fileId).setTrashed(true);
+  } catch (err) {
+    console.warn('ลบไฟล์เดิมไม่สำเร็จ ' + fileId + ': ' + err);
+  }
+}
+
+/**
+ * รวมสิ่งที่ส่งมาด้วยให้เป็นรูปแบบเดียว [{ label, url }]
+ * ฝั่งเว็บส่งมาได้สองแบบ: attachments (แบบใหม่) หรือ atth_a/atth_labels (แบบเดิม)
+ */
+function normalizeAttachments(data) {
+  if (Array.isArray(data.attachments)) {
+    return data.attachments
+      .map(function (item) {
+        return {
+          label: String((item && item.label) || '').trim(),
+          url: String((item && item.url) || '').trim()
+        };
+      })
+      .filter(function (item) { return item.url; });
+  }
+
   const urls = data.atth_a || [];
   const labels = data.atth_labels || [];
+  return urls
+    .map(function (url, index) {
+      return { label: String(labels[index] || '').trim(), url: String(url || '').trim() };
+    })
+    .filter(function (item) { return item.url; });
+}
 
-  return urls.map(function (url, index) {
-    const label = String(labels[index] || '').trim();
-    return label ? (label + ' · ' + url) : url;
+/**
+ * สิ่งที่ส่งมาด้วย เขียนเป็น "ชื่อรายการ · ลิงก์" บรรทัดละรายการ
+ * คอลัมน์นี้มีไว้ให้คนอ่านในชีต ตอนดึงกลับมาแก้ไขระบบจะอ่านจากคอลัมน์
+ * "ข้อมูลดิบ" แทน เพราะชื่อรายการที่มี " · " อยู่ในตัวจะแยกกลับไม่ถูก
+ */
+function formatAttachments(data) {
+  return normalizeAttachments(data).map(function (item) {
+    return item.label ? (item.label + ' · ' + item.url) : item.url;
   }).join('\n');
+}
+
+/** แยกข้อความในคอลัมน์ "สิ่งที่ส่งมาด้วย" กลับมา ใช้กับแถวเก่าที่ยังไม่มีข้อมูลดิบ */
+function parseAttachments(text) {
+  return String(text || '')
+    .split('\n')
+    .map(function (line) { return line.trim(); })
+    .filter(Boolean)
+    .map(function (line) {
+      const at = line.lastIndexOf(' · ');
+      if (at === -1) return { label: '', url: line };
+      return { label: line.slice(0, at).trim(), url: line.slice(at + 3).trim() };
+    })
+    .filter(function (item) { return item.url; });
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -297,9 +438,12 @@ function nextReceiveNumber() {
   return width > next.length ? next.padStart(width, '0') : next;
 }
 
-/** รายการล่าสุดสำหรับแสดงในหน้าเว็บ */
+/** รายการล่าสุดสำหรับแสดงในหน้าเว็บ (หน้าแรกใช้ docId ในนี้ทำปุ่มแก้ไข) */
 function listRecent(limit) {
   const sheet = getSheet();
+  ensureColumns(sheet);
+  backfillDocIds(sheet);
+
   const last = sheet.getLastRow();
   if (last < 2) return [];
 
@@ -307,41 +451,176 @@ function listRecent(limit) {
   const start = last - count + 1;
   const values = sheet.getRange(start, 1, count, HEADERS.length).getValues();
 
-  return values.reverse().map(function (r) {
+  return values.map(function (r, i) {
+    const doc = rowToDocument(r, start + i);
     return {
+      docId: doc.docId,
+      row: doc.row,
       savedAt: formatDate(r[0]),
-      receiveNumber: String(r[1] || ''),
-      receiveDate: formatDate(r[2]),
-      bookNumber: String(r[3] || ''),
-      bookDate: formatDate(r[4]),
-      from: r[5] || '',
-      to: r[6] || '',
-      subject: r[7] || '',
-      department: r[9] || '',
-      commanded: r[10] || '',
-      fileUrl: r[12] || ''
+      updatedAt: doc.updatedAt,
+      receiveNumber: doc.data.receiveNumber,
+      receiveDate: doc.data.receiveDate,
+      bookNumber: doc.data.bookNumber,
+      bookDate: doc.data.bookDate,
+      from: doc.data.fromInp,
+      to: doc.data.to,
+      subject: doc.data.subject,
+      department: doc.data.department,
+      commanded: doc.data.commanded,
+      fileUrl: doc.fileUrl
     };
-  });
+  }).reverse();
 }
 
-/** ตรวจว่าเลขทะเบียนนี้ถูกใช้แล้วหรือยัง */
-function findByReceiveNumber(receiveNumber) {
+/** ดึงเอกสารหนึ่งฉบับกลับมาเติมลงฟอร์ม */
+function getDocumentById(docId) {
+  const id = String(docId || '').trim();
+  if (!id) throw new Error('ไม่ได้ระบุรหัสเอกสาร');
+
+  const sheet = getSheet();
+  ensureColumns(sheet);
+
+  const found = findRowByDocId(sheet, id);
+  if (!found) throw new Error('ไม่พบเอกสารนี้ในทะเบียน อาจถูกลบออกจากชีตไปแล้ว');
+  return found;
+}
+
+/**
+ * แปลงค่าหนึ่งแถวเป็นออบเจ็กต์เอกสาร
+ *
+ * อ่านจากคอลัมน์ "ข้อมูลดิบ" ก่อนเสมอ เพราะเป็นค่าที่ผู้ใช้พิมพ์จริง
+ * ส่วนคอลัมน์อื่นผ่านการจัดรูปแบบของ Sheets มาแล้ว ใช้เป็นตัวสำรอง
+ * สำหรับแถวเก่าที่บันทึกไว้ก่อนมีคอลัมน์นี้
+ */
+function rowToDocument(r, row) {
+  let payload = null;
+  try {
+    const raw = r[COL_PAYLOAD - 1];
+    if (raw) payload = JSON.parse(raw);
+  } catch (err) {
+    console.warn('อ่านข้อมูลดิบแถว ' + row + ' ไม่ได้: ' + err);
+  }
+
+  const saved = (payload && payload.data) || {};
+  const pick = function (key, fallback) {
+    return saved[key] !== undefined ? saved[key] : fallback;
+  };
+
+  return {
+    row: row,
+    docId: String(r[COL_DOC_ID - 1] || (payload && payload.docId) || ''),
+    fileUrl: (payload && payload.fileUrl) || r[12] || '',
+    fileId: (payload && payload.fileId) || '',
+    filename: (payload && payload.filename) || r[14] || '',
+    savedAt: r[0] || null,
+    updatedAt: (payload && payload.updatedAt) || '',
+    hasPayload: !!payload,
+    data: {
+      receiveNumber: String(pick('receiveNumber', r[1] || '')),
+      receiveDate: pick('receiveDate', formatDate(r[2])),
+      bookNumber: String(pick('bookNumber', r[3] || '')),
+      bookDate: pick('bookDate', formatDate(r[4])),
+      fromInp: pick('fromInp', r[5] || ''),
+      to: pick('to', r[6] || ''),
+      subject: pick('subject', r[7] || ''),
+      action: pick('action', r[8] || ''),
+      department: pick('department', r[9] || ''),
+      commanded: pick('commanded', r[10] || ''),
+      msgCommand: pick('msgCommand', r[11] || ''),
+      attachments: Array.isArray(saved.attachments) ? saved.attachments : parseAttachments(r[13])
+    }
+  };
+}
+
+/** หาแถวจากรหัสเอกสาร คืน null ถ้าไม่เจอ */
+function findRowByDocId(sheet, docId) {
+  const id = String(docId || '').trim();
+  const last = sheet.getLastRow();
+  if (!id || last < 2) return null;
+
+  const ids = sheet.getRange(2, COL_DOC_ID, last - 1, 1).getValues();
+
+  for (let i = ids.length - 1; i >= 0; i--) {
+    if (String(ids[i][0] || '').trim() !== id) continue;
+    const row = i + 2;
+    return rowToDocument(sheet.getRange(row, 1, 1, HEADERS.length).getValues()[0], row);
+  }
+  return null;
+}
+
+/**
+ * ตรวจว่าเลขทะเบียนนี้ถูกใช้แล้วหรือยัง
+ * excludeDocId ใช้ตอนแก้ไข ไม่อย่างนั้นระบบจะเจอแถวของตัวเองแล้วเตือนว่าเลขซ้ำ
+ */
+function findByReceiveNumber(receiveNumber, excludeDocId) {
   const target = toArabicDigits(receiveNumber).replace(/[^0-9]/g, '');
   if (!target) return { exists: false };
 
   const sheet = getSheet();
+  ensureColumns(sheet);
+
   const last = sheet.getLastRow();
   if (last < 2) return { exists: false };
 
-  const values = sheet.getRange(2, 2, last - 1, 7).getValues();   // เลขที่รับ .. เรื่อง
+  const skip = String(excludeDocId || '').trim();
+  const values = sheet.getRange(2, 2, last - 1, HEADERS.length - 1).getValues();  // เลขที่รับ .. ข้อมูลดิบ
 
   for (let i = values.length - 1; i >= 0; i--) {
     const cell = toArabicDigits(values[i][0]).replace(/[^0-9]/g, '');
-    if (cell && cell === target) {
-      return { exists: true, row: i + 2, subject: values[i][6] || '' };
-    }
+    if (!cell || cell !== target) continue;
+    if (skip && String(values[i][COL_DOC_ID - 2] || '').trim() === skip) continue;
+    return { exists: true, row: i + 2, subject: values[i][6] || '' };
   }
   return { exists: false };
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ปรับโครงชีตให้ทันโค้ด
+
+   ชีตที่ใช้อยู่เดิมมี 15 คอลัมน์และไม่มีรหัสเอกสาร สองฟังก์ชันข้างล่าง
+   เติมคอลัมน์ที่ขาดและแจกรหัสให้แถวเก่าให้เอง ไม่ต้องไปแก้ในชีต
+   ══════════════════════════════════════════════════════════════════════ */
+
+/** เติมคอลัมน์และหัวตารางที่ขาด ทำงานจริงแค่ครั้งแรกครั้งเดียว */
+function ensureColumns(sheet) {
+  const width = sheet.getMaxColumns();
+  if (width < HEADERS.length) sheet.insertColumnsAfter(width, HEADERS.length - width);
+
+  const head = sheet.getRange(1, 1, 1, HEADERS.length).getValues()[0];
+  const missing = HEADERS.some(function (h, i) { return String(head[i] || '') !== h; });
+  if (!missing) return;
+
+  sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS])
+    .setFontWeight('bold').setBackground('#12203D').setFontColor('#FFFFFF');
+  formatTextColumns(sheet);
+}
+
+/**
+ * เลขที่รับ "0124" กับเลขที่หนังสือ ต้องเก็บเป็นข้อความ
+ * ถ้าปล่อยให้เป็นตัวเลข Sheets จะกินศูนย์นำหน้า ดึงกลับมาแก้ไขจะเหลือ 124
+ */
+function formatTextColumns(sheet) {
+  const rows = Math.max(sheet.getMaxRows() - 1, 1);
+  sheet.getRange(2, 2, rows, 1).setNumberFormat('@');
+  sheet.getRange(2, 4, rows, 1).setNumberFormat('@');
+  sheet.getRange(2, COL_PAYLOAD, rows, 1).setNumberFormat('@');
+}
+
+/** แจกรหัสเอกสารให้แถวที่ยังไม่มี เขียนกลับรวดเดียว */
+function backfillDocIds(sheet) {
+  const last = sheet.getLastRow();
+  if (last < 2) return;
+
+  const ids = sheet.getRange(2, COL_DOC_ID, last - 1, 1).getValues();
+  let changed = false;
+
+  ids.forEach(function (cell) {
+    if (String(cell[0] || '').trim()) return;
+    cell[0] = Utilities.getUuid();
+    changed = true;
+  });
+
+  if (changed) sheet.getRange(2, COL_DOC_ID, last - 1, 1).setValues(ids);
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -479,6 +758,8 @@ function createSheet(ss) {
   sheet.setColumnWidth(1, 140);
   sheet.setColumnWidth(8, 320);
   sheet.setColumnWidth(13, 240);
+  sheet.hideColumns(COL_PAYLOAD);   // ก้อน JSON ยาวมาก ซ่อนไว้ไม่ให้เกะกะเวลาคนเปิดชีตดู
+  formatTextColumns(sheet);
   return sheet;
 }
 
@@ -523,6 +804,8 @@ function nowStamp() {
 /** กดรันครั้งแรกเพื่อสร้างชีตและหัวตาราง */
 function setupSheet() {
   const sheet = getSheet();
+  ensureColumns(sheet);
+  backfillDocIds(sheet);
   Logger.log('พร้อมใช้งาน: ' + sheet.getName() + ' มีข้อมูล ' + Math.max(sheet.getLastRow() - 1, 0) + ' รายการ');
 
   const settings = getSettingsSheet();

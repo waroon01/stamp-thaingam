@@ -508,10 +508,15 @@ $('openImportJsonBtn').addEventListener('click', () => $('import-json').click())
 
 function handleFile(file) {
   if (!file || file.type !== 'application/pdf') {
+    if (fileLabel.dataset.pending === '1') delete fileLabel.dataset.pending;
     fileLabel.innerHTML =
       '<p class="text-sm text-seal-500">รองรับเฉพาะไฟล์ PDF เลือกไฟล์ใหม่อีกครั้งนะครับ</p>';
     return;
   }
+
+  // ข้อความชวนเลือกไฟล์ถูกแทนที่ด้วยชื่อไฟล์แล้ว แต่ pendingEdit ยังต้องอยู่ต่อ
+  // จนกว่าจะเรนเดอร์เสร็จ จึงปลดแค่ธงบนกล่องข้อความ
+  delete fileLabel.dataset.pending;
 
   fileLabel.innerHTML = `
     <div class="flex items-center gap-3 rounded-xl bg-ink-50 px-4 py-3">
@@ -536,11 +541,17 @@ async function loadPDFData(pdfData) {
     previewSection.classList.remove('hidden');
 
     await renderPDF(pdfDoc);
-    toast('เปิดเอกสารแล้ว เลือกตรายางจากแผงเครื่องมือได้เลย');
+
+    if (applyPendingEdit()) {
+      toast('ดึงค่าเดิมมาลงฟอร์มแล้ว ประทับตราแล้วกดบันทึกทับรายการเดิมได้เลย');
+    } else {
+      toast('เปิดเอกสารแล้ว เลือกตรายางจากแผงเครื่องมือได้เลย');
+    }
   } catch (err) {
     console.error(err);
     previewSection.classList.add('hidden');
     startSection.classList.remove('hidden');
+    clearPendingEdit();
     toast('เปิดไฟล์นี้ไม่ได้ ไฟล์อาจเสียหายหรือมีรหัสผ่าน', 'error');
   } finally {
     hideLoading();
@@ -551,6 +562,9 @@ $('back-to-upload-btn').addEventListener('click', () => {
   previewSection.classList.add('hidden');
   startSection.classList.remove('hidden');
   closeDrawer();
+
+  // เผื่อเพิ่งบันทึกอะไรไป รายการหน้าแรกจะได้ไม่ค้างของเก่า
+  if (cloudEnabled()) loadHomeRegistry();
 });
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2055,6 +2069,256 @@ async function cloudGet(params = {}) {
   return out;
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   แก้ไขรายการที่เคยลงทะเบียนไว้
+
+   ชีตเก็บแต่ "ค่าที่กรอกในฟอร์ม" กับลิงก์ไฟล์ PDF ไม่ได้เก็บตัวเอกสาร
+   ที่ขยับตราได้ ปุ่มแก้ไขจึงดึงค่ากลับมาลงฟอร์มให้ แล้วให้ผู้ใช้เปิดไฟล์
+   PDF ต้นฉบับมาประทับใหม่ พอกดบันทึกจะทับแถวเดิมในชีตด้วย docId
+   ไม่ใช่เพิ่มแถวใหม่
+   ═══════════════════════════════════════════════════════════════════ */
+
+/** เอกสารที่กำลังแก้ไขอยู่ตอนนี้ null = กำลังลงรับฉบับใหม่ */
+let editingDoc = null;
+
+/** เอกสารที่ดึงค่ามาแล้วแต่ยังรอผู้ใช้เลือกไฟล์ PDF */
+let pendingEdit = null;
+
+/** เติมค่าจากชีตกลับลงฟอร์มทุกช่อง รวมถึงสร้างช่องสิ่งที่ส่งมาด้วยใหม่ให้พอดี */
+function applyFormData(data = {}) {
+  const set = (id, value) => { $(id).value = value == null ? '' : String(value); };
+
+  set('receive-number', data.receiveNumber);
+  set('receive-date', data.receiveDate);
+  set('book-number', data.bookNumber);
+  set('book-date', data.bookDate);
+  set('fromInp', data.fromInp);
+  set('to', data.to);
+  set('subject', data.subject);
+  set('action', data.action);
+  set('msgCommand', data.msgCommand);
+
+  // ฝ่ายกับการสั่งการเป็น select ถ้าค่าเดิมไม่มีในตัวเลือก ต้องเพิ่มเข้าไปเอง
+  // ไม่อย่างนั้นเบราว์เซอร์จะเด้งกลับไปตัวเลือกแรกแบบเงียบ ๆ แล้วค่าเดิมหาย
+  selectOrAddOption('department', data.department);
+  selectOrAddOption('commanded', data.commanded);
+
+  applyAttachments(data.attachments || []);
+}
+
+function selectOrAddOption(id, value) {
+  const select = $(id);
+  const text = value == null ? '' : String(value);
+
+  if (text && !Array.from(select.options).some((o) => o.value === text)) {
+    select.add(new Option(text, text));
+  }
+  select.value = text;
+}
+
+/** สร้างช่องสิ่งที่ส่งมาด้วยให้ครบตามจำนวนรายการเดิม อย่างน้อยหนึ่งช่องเสมอ */
+function applyAttachments(items) {
+  const wrap = $('atthContainer');
+  const list = items.slice(0, MAX_ATTH_INPUTS);
+
+  wrap.innerHTML = '';
+  const rows = Math.max(list.length, 1);
+
+  for (let i = 0; i < rows; i++) {
+    const item = list[i] || { label: '', url: '' };
+    const div = document.createElement('div');
+    div.className = 'flex gap-2';
+    div.innerHTML =
+      '<input type="text" name="atth_label" placeholder="ชื่อรายการ" class="basis-[38%] shrink-0" />' +
+      '<input type="text" name="atth_a" placeholder="https://" class="flex-1 min-w-0" />';
+    div.querySelector('input[name="atth_label"]').value = item.label || '';
+    div.querySelector('input[name="atth_a"]').value = item.url || '';
+    wrap.appendChild(div);
+  }
+
+  if (items.length > MAX_ATTH_INPUTS) {
+    toast(`สิ่งที่ส่งมาด้วยมี ${items.length} รายการ แสดงได้ ${MAX_ATTH_INPUTS} รายการแรก`, 'info');
+  }
+}
+
+function enterEditMode(doc) {
+  editingDoc = doc;
+
+  const label = doc.data.receiveNumber
+    ? `เลขที่รับ ${toThaiDigits(doc.data.receiveNumber)}`
+    : (doc.data.subject || 'รายการเดิม');
+
+  $('editBannerLabel').textContent = label;
+  $('editBanner').classList.remove('hidden');
+  $('cloud-save-btn').innerHTML =
+    '<i class="fa-solid fa-cloud-arrow-up"></i> บันทึกทับรายการเดิม';
+}
+
+function exitEditMode() {
+  editingDoc = null;
+  $('editBanner').classList.add('hidden');
+  $('cloud-save-btn').innerHTML =
+    '<i class="fa-solid fa-cloud-arrow-up"></i> บันทึกลงทะเบียน';
+}
+
+/** ยกเลิกสถานะ "รอเลือกไฟล์" แล้วเก็บข้อความชวนเลือกไฟล์ออกจากหน้าแรก */
+function clearPendingEdit() {
+  pendingEdit = null;
+  if (fileLabel.dataset.pending === '1') {
+    fileLabel.innerHTML = '';
+    delete fileLabel.dataset.pending;
+  }
+}
+
+/** กดปุ่มแก้ไขจากรายการทะเบียน */
+async function beginEdit(docId) {
+  let doc;
+
+  showLoading('กำลังดึงข้อมูลเดิม...');
+  try {
+    doc = (await cloudGet({ action: 'document', docId })).doc;
+  } catch (err) {
+    console.error(err);
+    toast(cloudErrorMessage(err), 'error');
+    return;
+  } finally {
+    hideLoading();
+  }
+
+  closeSheet($('registryModal'));
+
+  // มีเอกสารเปิดค้างอยู่แล้ว ถามก่อนว่าจะประทับบนฉบับนี้ต่อหรือเปิดไฟล์ใหม่
+  if (fabricCanvases.length) {
+    const useOpen = confirm(
+      'มีเอกสารเปิดค้างอยู่ในหน้าทำงาน\n\n' +
+      'ตกลง = ใช้เอกสารที่เปิดอยู่ แล้วเติมค่าเดิมลงฟอร์ม\n' +
+      'ยกเลิก = เลือกไฟล์ PDF ของหนังสือฉบับนี้ใหม่'
+    );
+
+    if (useOpen) {
+      clearPendingEdit();
+      startSection.classList.add('hidden');
+      previewSection.classList.remove('hidden');
+      applyFormData(doc.data);
+      enterEditMode(doc);
+      openDrawer();
+      toast('ดึงค่าเดิมมาลงฟอร์มแล้ว');
+      return;
+    }
+  }
+
+  pendingEdit = doc;
+  fileLabel.dataset.pending = '1';
+  fileLabel.innerHTML = `
+    <div class="flex items-start gap-3 rounded-xl border border-seal-500/30 bg-seal-500/5 px-4 py-3">
+      <i class="fa-solid fa-pen-to-square text-seal-500 mt-0.5"></i>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-ink-900">
+          กำลังแก้ไข ${doc.data.receiveNumber ? `เลขที่รับ ${toThaiDigits(doc.data.receiveNumber)}` : 'รายการเดิม'}
+        </p>
+        <p class="text-xs text-ink-500 mt-0.5 truncate">${escapeHtml(doc.data.subject) || '(ไม่ระบุเรื่อง)'}</p>
+        <p class="text-xs text-ink-500 mt-1">เลือกไฟล์ PDF ของหนังสือฉบับนี้ แล้วระบบจะเติมค่าเดิมให้</p>
+      </div>
+      <button type="button" id="cancelPendingEditBtn"
+              class="shrink-0 text-xs font-medium text-seal-500 hover:text-seal-600">ยกเลิก</button>
+    </div>`;
+
+  $('cancelPendingEditBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    clearPendingEdit();
+    toast('ยกเลิกการแก้ไขแล้ว', 'info');
+  });
+
+  dropZone.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  // เบราว์เซอร์บางตัวไม่ยอมให้เปิดกล่องเลือกไฟล์หลังรอผลจากเซิร์ฟเวอร์
+  // เพราะถือว่าหลุดจากการกดของผู้ใช้แล้ว ถ้าถูกบล็อกก็ยังกดที่กล่องลากไฟล์ได้เอง
+  fileInput.click();
+}
+
+/** เรียกหลังเรนเดอร์ PDF เสร็จ คืนค่า true ถ้าไฟล์นี้เปิดมาเพื่อแก้ไขรายการเดิม */
+function applyPendingEdit() {
+  if (!pendingEdit) return false;
+
+  const doc = pendingEdit;
+  clearPendingEdit();
+
+  applyFormData(doc.data);
+  enterEditMode(doc);
+  openDrawer();
+  return true;
+}
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+/* ── รายการทะเบียน ─────────────────────────────────────────── */
+
+/** วาดรายการทะเบียนหนึ่งชุด ใช้ร่วมกันทั้งหน้าแรกและกล่องในหน้าทำงาน */
+function renderRegistryRows(rows, target) {
+  target.innerHTML = '';
+
+  rows.forEach((row) => {
+    const item = document.createElement('div');
+    item.className = 'rounded-xl border border-desk-300 px-4 py-3 hover:border-ink-300 transition-colors';
+    item.innerHTML = `
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="font-mono text-xs text-ink-500">
+            เลขที่รับ ${toThaiDigits(row.receiveNumber) || '-'} · รับเมื่อ ${formatThaiDate(row.receiveDate) || '-'}
+          </p>
+          <p class="text-sm text-ink-900 font-medium mt-0.5 truncate">${escapeHtml(row.subject) || '(ไม่ระบุเรื่อง)'}</p>
+          <p class="text-xs text-ink-500 mt-0.5 truncate">จาก ${escapeHtml(row.from) || '-'} · ${escapeHtml(row.department) || '-'}</p>
+        </div>
+        <div class="shrink-0 flex items-center gap-1">
+          ${row.fileUrl ? `<a href="${escapeHtml(row.fileUrl)}" target="_blank" rel="noopener noreferrer"
+              class="w-8 h-8 rounded-lg inline-flex items-center justify-center text-ink-500 hover:bg-ink-50 hover:text-ink-900"
+              title="เปิดไฟล์ PDF"><i class="fa-solid fa-file-pdf"></i></a>` : ''}
+          ${row.docId ? `<button type="button" data-edit-doc="${escapeHtml(row.docId)}"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 px-2.5 py-1.5 text-xs font-medium
+                     text-ink-700 hover:bg-ink-50 hover:border-ink-300 transition-colors">
+              <i class="fa-solid fa-pen-to-square text-[11px]"></i> แก้ไข</button>` : ''}
+        </div>
+      </div>`;
+    target.appendChild(item);
+  });
+}
+
+/** คลิกปุ่มแก้ไขในรายการ ผูกครั้งเดียวที่ตัวคอนเทนเนอร์ ไม่ต้องผูกทีละปุ่ม */
+function bindRegistryEditClicks(target) {
+  target.addEventListener('click', (e) => {
+    const button = e.target.closest('[data-edit-doc]');
+    if (button) beginEdit(button.dataset.editDoc);
+  });
+}
+
+/** โหลดทะเบียนล่าสุดมาแสดงที่หน้าแรก */
+async function loadHomeRegistry() {
+  const list = $('homeRegistryList');
+  const refresh = $('homeRegistryRefresh');
+
+  list.innerHTML = '<p class="text-sm text-ink-500">กำลังโหลด...</p>';
+  refresh.disabled = true;
+
+  try {
+    const out = await cloudGet({ action: 'list', limit: 20 });
+
+    if (!out.rows.length) {
+      list.innerHTML = '<p class="text-sm text-ink-500">ยังไม่มีรายการในทะเบียน</p>';
+      return;
+    }
+    renderRegistryRows(out.rows, list);
+  } catch (err) {
+    console.error(err);
+    list.innerHTML = `<p class="text-sm text-seal-500">${escapeHtml(cloudErrorMessage(err))}</p>`;
+  } finally {
+    refresh.disabled = false;
+  }
+}
+
 function pdfToBase64(pdf) {
   return pdf.output('datauristring').split(',')[1];
 }
@@ -2087,7 +2351,11 @@ async function saveToCloud({ saveToSheet }) {
   if (saveToSheet) {
     try {
       showLoading('กำลังตรวจเลขทะเบียน...');
-      const dup = await cloudGet({ action: 'check', receiveNumber: data.receiveNumber });
+      const dup = await cloudGet({
+        action: 'check',
+        receiveNumber: data.receiveNumber,
+        excludeDocId: editingDoc ? editingDoc.docId : ''
+      });
       hideLoading();
       if (dup.exists && !confirm(`เลขที่รับ ${data.receiveNumber} มีอยู่แล้วในทะเบียน (เรื่อง: ${dup.subject || '-'})\n\nต้องการบันทึกเพิ่มอีกรายการหรือไม่?`)) {
         return;
@@ -2114,10 +2382,20 @@ async function saveToCloud({ saveToSheet }) {
       data,
       saveToSheet,
       pdfBase64,
-      filename: `${baseName}.pdf`.replace(/[\\/:*?"<>|]/g, '-')
+      filename: `${baseName}.pdf`.replace(/[\\/:*?"<>|]/g, '-'),
+      // ส่ง docId เฉพาะรอบที่ลงทะเบียนจริง ปุ่ม "อัปโหลดขึ้น Drive" อย่างเดียว
+      // ไม่ควรไปแตะแถวเดิมในชีต
+      docId: saveToSheet && editingDoc ? editingDoc.docId : ''
     });
 
-    toast(saveToSheet ? 'บันทึกลงทะเบียนและ Drive แล้ว' : 'อัปโหลดขึ้น Drive แล้ว');
+    toast(out.updated ? 'แก้ไขรายการเดิมแล้ว'
+      : (saveToSheet ? 'บันทึกลงทะเบียนและ Drive แล้ว' : 'อัปโหลดขึ้น Drive แล้ว'));
+
+    if (out.updated) {
+      exitEditMode();
+      if (!startSection.classList.contains('hidden')) loadHomeRegistry();
+    }
+
     if (out.fileUrl) showCloudResult(out, saveToSheet);
   } catch (err) {
     console.error(err);
@@ -2133,7 +2411,8 @@ function showCloudResult(out, savedToSheet) {
   results.innerHTML = `
     <div class="rounded-xl border border-leaf-500/40 bg-leaf-500/5 px-4 py-3">
       <p class="text-sm font-medium text-ink-900">
-        ${savedToSheet ? 'บันทึกลงทะเบียนเรียบร้อย' : 'อัปโหลดไฟล์เรียบร้อย'}
+        ${out.updated ? 'แก้ไขรายการเดิมเรียบร้อย'
+          : (savedToSheet ? 'บันทึกลงทะเบียนเรียบร้อย' : 'อัปโหลดไฟล์เรียบร้อย')}
       </p>
       ${savedToSheet && out.row ? `<p class="text-xs text-ink-500 mt-1 font-mono">บันทึกที่แถว ${out.row} ของชีต</p>` : ''}
       <a href="${out.fileUrl}" target="_blank" rel="noopener noreferrer"
@@ -2161,7 +2440,7 @@ async function fetchNextReceiveNumber() {
   }
 }
 
-/** ดูรายการที่ลงรับไว้แล้ว */
+/** ดูรายการที่ลงรับไว้แล้ว (กล่องในหน้าทำงาน) */
 async function showRegistry() {
   const list = $('registryList');
   list.innerHTML = '<p class="text-sm text-ink-500">กำลังโหลด...</p>';
@@ -2174,28 +2453,10 @@ async function showRegistry() {
       list.innerHTML = '<p class="text-sm text-ink-500">ยังไม่มีรายการในทะเบียน</p>';
       return;
     }
-
-    list.innerHTML = '';
-    out.rows.forEach((row) => {
-      const item = document.createElement('div');
-      item.className = 'rounded-xl border border-desk-300 px-4 py-3 hover:border-ink-300 transition-colors';
-      item.innerHTML = `
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <p class="font-mono text-xs text-ink-500">
-              เลขที่รับ ${toThaiDigits(row.receiveNumber) || '-'} · รับเมื่อ ${formatThaiDate(row.receiveDate) || '-'}
-            </p>
-            <p class="text-sm text-ink-900 font-medium mt-0.5 truncate">${row.subject || '(ไม่ระบุเรื่อง)'}</p>
-            <p class="text-xs text-ink-500 mt-0.5 truncate">จาก ${row.from || '-'} · ${row.department || '-'}</p>
-          </div>
-          ${row.fileUrl ? `<a href="${row.fileUrl}" target="_blank" rel="noopener noreferrer"
-              class="shrink-0 text-ink-500 hover:text-ink-900" title="เปิดไฟล์"><i class="fa-solid fa-file-pdf"></i></a>` : ''}
-        </div>`;
-      list.appendChild(item);
-    });
+    renderRegistryRows(out.rows, list);
   } catch (err) {
     console.error(err);
-    list.innerHTML = `<p class="text-sm text-seal-500">${cloudErrorMessage(err)}</p>`;
+    list.innerHTML = `<p class="text-sm text-seal-500">${escapeHtml(cloudErrorMessage(err))}</p>`;
   }
 }
 
@@ -2204,12 +2465,23 @@ $('cloud-save-btn').addEventListener('click', () => saveToCloud({ saveToSheet: t
 $('next-number-btn').addEventListener('click', fetchNextReceiveNumber);
 $('registry-btn').addEventListener('click', showRegistry);
 $('closeRegistryModal').addEventListener('click', () => closeSheet($('registryModal')));
+$('homeRegistryRefresh').addEventListener('click', loadHomeRegistry);
+$('cancelEditBtn').addEventListener('click', () => {
+  exitEditMode();
+  toast('ออกจากโหมดแก้ไขแล้ว บันทึกครั้งต่อไปจะเป็นรายการใหม่', 'info');
+});
+
+bindRegistryEditClicks($('homeRegistryList'));
+bindRegistryEditClicks($('registryList'));
 
 function initCloud() {
   if (!cloudEnabled()) return;
 
   ['upload-drive-btn', 'cloud-save-btn', 'next-number-btn', 'registry-btn']
     .forEach((id) => $(id).classList.remove('hidden'));
+
+  $('homeRegistry').classList.remove('hidden');
+  loadHomeRegistry();
 
   // เมื่อมีระบบทะเบียนแล้ว ให้ปุ่มบันทึกลงเครื่องเป็นตัวเลือกรอง
   $('local-save-btn').classList.remove('btn-primary');
